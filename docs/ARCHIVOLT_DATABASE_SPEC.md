@@ -7,9 +7,10 @@
 > `fts_vector` trigger and read-only RLS policies. If an authoritative spec
 > differs, reconcile with a follow-up migration.
 >
-> Not verified against pgvector: the SQL was applied to a plain Postgres 16 with
-> the vector type/HNSW index shimmed out. Run `supabase db reset` locally to
-> confirm the full migration.
+> Verified by applying the migration to the `supabase/postgres:15.8.1.085`
+> image (pgvector, `auth.uid()`, `authenticated` role): the HNSW index is used
+> for cosine search, FTS matches via the trigger, and RLS hides other orgs'
+> rows and blocks direct writes. The full `supabase start` stack was not run.
 
 ## Overview
 
