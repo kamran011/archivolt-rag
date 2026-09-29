@@ -21,6 +21,11 @@ port = 54324
 [storage]
 file_size_limit = "52428800"  # 50MB
 
+# Private bucket for original uploads (backend uses STORAGE_BUCKET, default "documents").
+[storage.buckets.documents]
+public = false
+file_size_limit = "50MiB"
+
 [auth]
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/callback"]
