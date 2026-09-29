@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_BUCKET: str = "documents"
     MAX_UPLOAD_SIZE_MB: int = 50
+    MAX_PDF_PAGES: int = 500
 
 
 settings = Settings()

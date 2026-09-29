@@ -29,7 +29,7 @@ async def test_failed_ingestion_status_is_persisted(env):  # noqa: F811
     _, orgs = env
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         h, kb = await onboard(client, orgs, uuid.uuid4(), f"fail-{uuid.uuid4().hex[:6]}")
-        doc_id = await upload(client, h, kb, "broken.pdf", b"this is not a pdf")
+        doc_id = await upload(client, h, kb, "broken.pdf", b"%PDF-1.4\n" + b"\x01garbage" * 50)
 
         doc = await get_doc(client, h, kb, doc_id)
         # Regression: this used to stay in 'parsing' because the rollback erased 'failed'.
@@ -63,3 +63,22 @@ async def test_recover_stuck_ingestions_only_touches_old_in_flight_docs(env):  #
         assert (await get_doc(client, h, kb, old))["status"] == "failed"
         assert (await get_doc(client, h, kb, fresh))["status"] == "parsing"
         assert (await get_doc(client, h, kb, done))["status"] == "ready"
+
+
+async def test_upload_rejects_mismatched_content_and_sanitizes_filename(env):  # noqa: F811
+    _, orgs = env
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        h, kb = await onboard(client, orgs, uuid.uuid4(), f"safe-{uuid.uuid4().hex[:6]}")
+        url = f"/api/v1/knowledge-bases/{kb}/documents/upload"
+
+        r = await client.post(
+            url, files={"file": ("fake.pdf", b"MZ not a pdf", "application/pdf")}, headers=h
+        )
+        assert r.status_code == 422, r.text
+
+        doc_id = await upload(
+            client, h, kb, "../../etc/evil.pdf", make_pdf({"Title": "harmless body text"})
+        )
+        doc = await get_doc(client, h, kb, doc_id)
+        assert doc["file_name"] == "evil.pdf"
+        assert ".." not in doc["storage_path"]

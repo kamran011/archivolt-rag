@@ -10,6 +10,7 @@ from app.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.domains.documents.schemas import DocumentUpdate
 from app.domains.documents.storage import storage_service
+from app.domains.documents.upload_safety import read_limited, sanitize_filename, sniff_content
 from app.domains.knowledge_bases.service import kb_service
 from app.models.document import AuthorityTier, Document, DocumentStatus, FileType
 
@@ -166,18 +167,17 @@ class DocumentService:
         effective_date: datetime | None = None,
     ) -> Document:
         file_type = self._validate_upload(file)
+        safe_name = sanitize_filename(file.filename)
 
-        content = await file.read()
-        max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-        if len(content) > max_bytes:
-            raise ValidationError(
-                f"File exceeds maximum size of {settings.MAX_UPLOAD_SIZE_MB}MB"
-            )
+        content = await read_limited(
+            file, settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024, settings.MAX_UPLOAD_SIZE_MB
+        )
         if len(content) == 0:
             raise ValidationError("File is empty")
+        sniff_content(content, file_type)
 
         doc_id = uuid.uuid4()
-        storage_path = storage_service.build_path(org_id, kb_id, doc_id, file.filename)
+        storage_path = storage_service.build_path(org_id, kb_id, doc_id, safe_name)
 
         await storage_service.upload_file(
             storage_path, content, file.content_type or "application/octet-stream"
@@ -187,8 +187,8 @@ class DocumentService:
             id=doc_id,
             organization_id=org_id,
             knowledge_base_id=kb_id,
-            title=file.filename.rsplit(".", 1)[0],
-            file_name=file.filename,
+            title=safe_name.rsplit(".", 1)[0],
+            file_name=safe_name,
             file_type=file_type,
             file_size=len(content),
             storage_path=storage_path,

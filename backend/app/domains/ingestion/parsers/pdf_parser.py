@@ -25,6 +25,13 @@ class PDFParser(BaseParser):
         except Exception as e:
             raise IngestionError(f"Failed to open PDF: {e}") from e
 
+        page_count = doc.page_count
+        if page_count > settings.MAX_PDF_PAGES:
+            doc.close()
+            raise IngestionError(
+                f"PDF has {page_count} pages; the limit is {settings.MAX_PDF_PAGES}"
+            )
+
         try:
             body_size = self._estimate_body_font_size(doc)
             pages: list[ParsedPage] = []
