@@ -20,7 +20,8 @@ from app.domains.documents.schemas import (
     SummaryView,
 )
 from app.domains.documents.service import document_service
-from app.domains.ingestion.background import run_ingestion
+from app.domains.ingestion.jobs import enqueue_ingestion
+from app.domains.jobs.setup import worker
 from app.domains.retrieval.access import scope_for
 from app.models.organization_member import OrgRole
 
@@ -53,11 +54,14 @@ async def upload_document(
         restricted=restricted,
         tags=[t for t in tags.split(",") if t.strip()],
     )
-    # Commit explicitly so the row is visible to the background task's own
-    # DB session, regardless of dependency-cleanup-vs-background-task ordering.
+    # The ingestion job is created in the same transaction as the document, so neither can
+    # exist without the other. Commit before running so the job's own session sees both.
+    job = await enqueue_ingestion(db, current_user.organization_id, doc.id)
     await db.commit()
 
-    background_tasks.add_task(run_ingestion, doc.id)
+    # Run it right away; if this process dies or the attempt fails transiently, the durable
+    # job row is retried/reclaimed by the worker.
+    background_tasks.add_task(worker.run_job, job.id)
 
     return DocumentResponse.model_validate(doc)
 
@@ -178,8 +182,9 @@ async def create_document_version(
         uploaded_by=current_user.id,
         scope=scope_for(current_user),
     )
+    job = await enqueue_ingestion(db, current_user.organization_id, new_doc.id)
     await db.commit()
-    background_tasks.add_task(run_ingestion, new_doc.id)
+    background_tasks.add_task(worker.run_job, job.id)
     return DocumentResponse.model_validate(new_doc)
 
 

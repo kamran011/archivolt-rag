@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 
 import structlog
@@ -31,7 +33,17 @@ async def lifespan(app: FastAPI):
         await recover_stuck_ingestions()
     except Exception as e:
         logger.error("stuck_ingestion_recovery_failed", error=str(e))
+
+    worker_task = None
+    if settings.JOB_WORKER_IN_PROCESS:
+        from app.domains.jobs.setup import worker
+
+        worker_task = asyncio.create_task(worker.run_forever(), name="job-worker")
     yield
+    if worker_task is not None:
+        worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
     await engine.dispose()
 
 

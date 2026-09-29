@@ -86,6 +86,7 @@ async def env(monkeypatch):
 
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr("app.domains.ingestion.background.AsyncSessionLocal", maker)
+    monkeypatch.setattr("app.domains.jobs.sessions.AsyncSessionLocal", maker)
 
     store: dict[str, bytes] = {}
 

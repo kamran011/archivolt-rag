@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_EXPANSIONS: int = 2  # extra strategies tried when evidence is insufficient
     # Documents still in an in-flight ingestion status after this long are marked failed.
     INGESTION_STUCK_AFTER_MINUTES: int = 30
+    # Background jobs (see domains/jobs). Failed jobs retry with exponential backoff.
+    JOB_MAX_ATTEMPTS: int = 3
+    JOB_RETRY_BASE_S: float = 5.0
+    JOB_RETRY_MAX_S: float = 300.0
+    JOB_TIMEOUT_S: float = 600.0  # a single attempt is cancelled after this long
+    JOB_LOCK_TIMEOUT_S: float = 900.0  # a 'running' job older than this is presumed orphaned
+    JOB_POLL_INTERVAL_S: float = 2.0
+    # Run the polling worker inside the API process (retries, orphan recovery). Turn off when
+    # running dedicated workers with `python -m app.worker`.
+    JOB_WORKER_IN_PROCESS: bool = True
     # If the claim verifier itself fails, abstain instead of returning the answer flagged
     # as 'unverified'.
     REQUIRE_VERIFICATION: bool = False

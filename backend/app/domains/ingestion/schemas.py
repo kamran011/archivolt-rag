@@ -45,3 +45,6 @@ class IngestionStatusResponse(BaseModel):
     status: str
     progress_message: str | None = None
     error_message: str | None = None
+    job_status: str | None = None  # queued | running | succeeded | failed | dead
+    attempts: int | None = None
+    max_attempts: int | None = None
