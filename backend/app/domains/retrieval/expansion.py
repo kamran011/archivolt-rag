@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.filters import apply_common_filters
 from app.domains.retrieval.mapping import row_to_retrieved_chunk
 from app.domains.retrieval.schemas import RetrievedChunk
@@ -20,6 +21,7 @@ async def expand_with_neighbors(
     *,
     top_n: int = EXPAND_TOP_N,
     window: int = 1,
+    scope: AccessScope | None = None,
 ) -> list[RetrievedChunk]:
     """Adds the chunks adjacent (same document, chunk_index ± window) to the
     top hits so answers aren't cut off at chunk boundaries. Neighbors are real
@@ -51,7 +53,7 @@ async def expand_with_neighbors(
             tuple_(Chunk.document_id, Chunk.chunk_index).in_(list(wanted)),
         )
     )
-    stmt = apply_common_filters(stmt, None)
+    stmt = apply_common_filters(stmt, None, scope)
     rows = (await db.execute(stmt)).all()
 
     expanded = list(chunks)

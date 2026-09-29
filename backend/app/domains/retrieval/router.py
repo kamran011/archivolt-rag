@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.core.rate_limit import rate_limit
 from app.domains.auth.dependencies import require_org
 from app.domains.auth.schemas import CurrentUser
+from app.domains.retrieval.access import scope_for
 from app.domains.retrieval.debug import DebugRequest, DebugResponse, retrieval_debugger
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievalResult
 from app.domains.retrieval.service import retrieval_service
@@ -22,7 +23,9 @@ async def search(
     current_user: CurrentUser = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ):
-    return await retrieval_service.retrieve(db, current_user.organization_id, request)
+    return await retrieval_service.retrieve(
+        db, current_user.organization_id, request, scope=scope_for(current_user)
+    )
 
 
 @router.post(
@@ -37,4 +40,6 @@ async def debug(
 ):
     """Stage-by-stage retrieval trace (routing, engines, rerank, filters, gate,
     context). Same org scoping as /search; no answer is generated."""
-    return await retrieval_debugger.run(db, current_user.organization_id, request)
+    return await retrieval_debugger.run(
+        db, current_user.organization_id, request, scope_for(current_user)
+    )

@@ -15,6 +15,13 @@ class RetrievalFilters(BaseModel):
     include_superseded: bool = False
     """By default, only the current version of each document is searched.
     Set True for historical queries that should also see superseded versions."""
+    tags: list[str] | None = None
+    """Match documents carrying ANY of these tags."""
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
+    as_of: datetime | None = None
+    """Only documents whose effective date is on/before this instant (or undated). Combine
+    with include_superseded=True to answer 'what did the policy say on <date>'."""
     min_authority: str | None = None
     """One of AuthorityTier values ('draft', 'standard', 'authoritative').
     When set, excludes evidence below this authority tier."""

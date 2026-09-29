@@ -11,6 +11,7 @@ from app.domains.chat.schemas import ChatRequest, ConversationCreate
 from app.domains.observability.store import save_rag_trace
 from app.domains.rag.schemas import RAGRequest, RAGResponse
 from app.domains.rag.service import rag_service
+from app.domains.retrieval.access import AccessScope
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 
@@ -125,6 +126,7 @@ class ChatService:
         org_id: uuid.UUID,
         user_id: uuid.UUID,
         request: ChatRequest,
+        scope: AccessScope | None = None,
     ) -> RAGResponse:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
         history = await self._build_history(db, conv)
@@ -144,6 +146,7 @@ class ChatService:
                 model=request.model,
                 agentic=request.agentic,
             ),
+            scope,
         )
 
         db.add(
@@ -199,6 +202,7 @@ class ChatService:
         org_id: uuid.UUID,
         user_id: uuid.UUID,
         request: ChatRequest,
+        scope: AccessScope | None = None,
     ) -> AsyncIterator[dict]:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
         history = await self._build_history(db, conv)
@@ -222,6 +226,7 @@ class ChatService:
                 model=request.model,
                 agentic=request.agentic,
             ),
+            scope,
         ):
             if event["type"] == "token":
                 full_answer_parts.append(event["content"])

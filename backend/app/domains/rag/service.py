@@ -27,6 +27,7 @@ from app.domains.rag.schemas import (
     VerificationStatus,
 )
 from app.domains.rag.stages import build_stages
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
@@ -67,10 +68,16 @@ class _Retrieved:
 
 
 async def _retrieve_candidates(
-    db: AsyncSession, org_id: uuid.UUID, request: RAGRequest, route: RouteDecision
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    scope: AccessScope | None,
 ) -> _Retrieved:
     if request.agentic and settings.ENABLE_AGENTIC_RAG:
-        agent = await retrieval_agent.run(db, org_id, request.query, request.knowledge_base_ids)
+        agent = await retrieval_agent.run(
+            db, org_id, request.query, request.knowledge_base_ids, scope=scope
+        )
         return _Retrieved(
             chunks=agent.chunks[:AGENTIC_MAX_CANDIDATES],
             retrieval_time_ms=agent.elapsed_ms,
@@ -86,6 +93,7 @@ async def _retrieve_candidates(
             strategy=route.strategy,
             top_k=20,
         ),
+        scope=scope,
     )
     return _Retrieved(result.chunks, result.retrieval_time_ms, result.strategy)
 
@@ -143,6 +151,7 @@ async def _gather_evidence(
     request: RAGRequest,
     route: RouteDecision,
     trace: RetrievalTrace,
+    scope: AccessScope | None,
 ) -> _Evidence:
     """Retrieve, rerank, filter and check the evidence; when the sufficiency gate says it
     is not enough, widen retrieval with another strategy (bounded) before giving up.
@@ -157,7 +166,7 @@ async def _gather_evidence(
         pass
 
     with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-        retrieval = await _retrieve_candidates(db, org_id, request, route)
+        retrieval = await _retrieve_candidates(db, org_id, request, route, scope)
     candidates = list(retrieval.chunks)
     tried = [retrieval.strategy]
 
@@ -188,7 +197,7 @@ async def _gather_evidence(
         step = ladder[attempt]
         attempt += 1
         with trace.span("retrieval_expansion", strategy=step.strategy, attempt=attempt):
-            extra = await _retrieve_candidates(db, org_id, request, step)
+            extra = await _retrieve_candidates(db, org_id, request, step, scope)
         tried.append(extra.strategy)
         candidates = _merge_candidates(candidates, extra.chunks)
 
@@ -352,12 +361,13 @@ class RAGService:
         db: AsyncSession,
         org_id: uuid.UUID,
         request: RAGRequest,
+        scope: AccessScope | None = None,
     ) -> RAGResponse:
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
         # 1-4. Retrieve, rerank, filter, evidence + sufficiency gates (with bounded expansion)
-        ev = await _gather_evidence(db, org_id, request, route, trace)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope)
         retrieval_result, candidates = ev.retrieval, ev.candidates
         reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
         gate_result = ev.gate
@@ -402,7 +412,7 @@ class RAGService:
         filtered_before_expansion = filtered
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
-                filtered = await expand_with_neighbors(db, org_id, filtered)
+                filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
             selected_chunks, context_tokens = ContextAssembler.assemble(filtered)
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
         retrieval_metadata["context_tokens"] = context_tokens
@@ -480,12 +490,13 @@ class RAGService:
         db: AsyncSession,
         org_id: uuid.UUID,
         request: RAGRequest,
+        scope: AccessScope | None = None,
     ) -> AsyncIterator[dict]:
         """Same pipeline through context assembly, then streams tokens via SSE-shaped events."""
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        ev = await _gather_evidence(db, org_id, request, route, trace)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope)
         retrieval_result = ev.retrieval
         reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
         gate_result = ev.gate
@@ -518,7 +529,7 @@ class RAGService:
         filtered_before_expansion = filtered
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
-                filtered = await expand_with_neighbors(db, org_id, filtered)
+                filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
             selected_chunks, _ = ContextAssembler.assemble(filtered)
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
 

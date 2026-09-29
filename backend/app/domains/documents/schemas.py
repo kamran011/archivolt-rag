@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.document import AuthorityTier, DocumentStatus, FileType
 
@@ -24,6 +24,8 @@ class DocumentResponse(BaseModel):
     superseded_at: datetime | None
     effective_date: datetime | None
     authority_tier: AuthorityTier
+    tags: list[str] = []
+    restricted: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -38,6 +40,8 @@ class DocumentDetailResponse(DocumentResponse):
 class DocumentUpdate(BaseModel):
     authority_tier: AuthorityTier | None = None
     effective_date: datetime | None = None
+    tags: list[str] | None = Field(default=None, max_length=50)
+    restricted: bool | None = None
 
 
 class SignedUrlResponse(BaseModel):

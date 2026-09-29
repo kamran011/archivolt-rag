@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.tree_engine import fetch_node_chunks, load_document_trees
 from app.domains.retrieval.schemas import RetrievalFilters, RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
@@ -102,6 +103,8 @@ class _State:
     steps: list[AgentStep] = field(default_factory=list)
     seen_queries: set[str] = field(default_factory=set)
     trees: dict = field(default_factory=dict)
+    # Who the run acts for. Fixed by the caller; never model-controlled.
+    scope: AccessScope | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     stop_reason: StopReason = "max_steps"
@@ -126,9 +129,10 @@ class RetrievalAgent:
         question: str,
         kb_ids: list[uuid.UUID],
         filters: RetrievalFilters | None = None,
+        scope: AccessScope | None = None,
     ) -> AgentResult:
         start = time.perf_counter()
-        state = _State()
+        state = _State(scope=scope)
         try:
             await asyncio.wait_for(
                 self._loop(db, org_id, question, kb_ids, filters, state),
@@ -264,12 +268,12 @@ class RetrievalAgent:
 
         if kind == "outline":
             if not state.trees:
-                state.trees = await load_document_trees(db, org_id, kb_ids, filters)
+                state.trees = await load_document_trees(db, org_id, kb_ids, filters, state.scope)
             return 0, f"{len(state.trees)} documents"
 
         # read_section
         if not state.trees:
-            state.trees = await load_document_trees(db, org_id, kb_ids, filters)
+            state.trees = await load_document_trees(db, org_id, kb_ids, filters, state.scope)
         lookup: dict[str, tuple[str, TreeNode]] = {
             f"{k}:{n.node_id}": (k, n)
             for k, (_, nodes) in state.trees.items()
@@ -279,7 +283,8 @@ class RetrievalAgent:
         if target is None:
             return 0, f"(unknown ref) {str(action['ref'])[:40]}"
         chunks = await fetch_node_chunks(
-            db, org_id, kb_ids, filters, state.trees, [target], SECTION_CHUNK_LIMIT, "agent_section"
+            db, org_id, kb_ids, filters, state.trees, [target], SECTION_CHUNK_LIMIT,
+            "agent_section", state.scope,
         )
         return state.add(chunks), f"{action['ref']} {target[1].title}"
 
@@ -297,6 +302,7 @@ class RetrievalAgent:
                 top_k=SEARCH_TOP_K,
                 filters=filters,
             ),
+            scope=state.scope,
         )
         return state.add(result.chunks)
 

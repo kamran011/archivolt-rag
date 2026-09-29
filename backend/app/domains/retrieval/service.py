@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.hybrid_engine import HybridRetrievalEngine
 from app.domains.retrieval.engines.keyword_engine import KeywordRetrievalEngine
 from app.domains.retrieval.engines.tree_engine import TreeRetrievalEngine
@@ -24,6 +25,7 @@ class RetrievalService:
         org_id: uuid.UUID,
         request: RetrievalRequest,
         embedding_model: str = "text-embedding-3-small",
+        scope: AccessScope | None = None,
     ) -> RetrievalResult:
         strategy = request.strategy
 
@@ -36,6 +38,7 @@ class RetrievalService:
             request.top_k,
             request.filters,
             embedding_model,
+            scope,
         )
         if strategy == "tree" and not chunks:
             # Nothing to navigate (no trees / navigation failed): degrade to hybrid.
@@ -48,6 +51,7 @@ class RetrievalService:
                 request.top_k,
                 request.filters,
                 embedding_model,
+                scope,
             )
         elapsed_ms = (time.perf_counter() - start) * 1000
 

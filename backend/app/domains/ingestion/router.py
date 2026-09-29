@@ -10,6 +10,7 @@ from app.domains.auth.schemas import CurrentUser
 from app.domains.documents.service import document_service
 from app.domains.ingestion.background import run_ingestion
 from app.domains.ingestion.schemas import IngestionStatusResponse
+from app.domains.retrieval.access import scope_for
 from app.models.organization_member import OrgRole
 
 router = APIRouter()
@@ -29,7 +30,9 @@ async def trigger_ingestion(
     db: AsyncSession = Depends(get_db),
 ):
     # Verify the document belongs to this org before dispatching
-    await document_service.get(db, current_user.organization_id, doc_id)
+    await document_service.get(
+        db, current_user.organization_id, doc_id, scope=scope_for(current_user)
+    )
     background_tasks.add_task(run_ingestion, doc_id)
     return {"status": "queued", "document_id": str(doc_id)}
 
@@ -47,7 +50,9 @@ async def trigger_reprocess(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    await document_service.get(db, current_user.organization_id, doc_id)
+    await document_service.get(
+        db, current_user.organization_id, doc_id, scope=scope_for(current_user)
+    )
 
     background_tasks.add_task(run_ingestion, doc_id, True)
     return {"status": "queued", "document_id": str(doc_id)}
@@ -59,7 +64,9 @@ async def get_ingestion_status(
     current_user: CurrentUser = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ):
-    doc = await document_service.get(db, current_user.organization_id, doc_id)
+    doc = await document_service.get(
+        db, current_user.organization_id, doc_id, scope=scope_for(current_user)
+    )
     return IngestionStatusResponse(
         document_id=str(doc.id),
         status=doc.status.value,

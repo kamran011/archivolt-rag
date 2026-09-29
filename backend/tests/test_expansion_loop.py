@@ -41,7 +41,7 @@ class FakeLLM:
 
 
 def scripted_retrieval(by_strategy: dict[str, list[RetrievedChunk]], calls: list[str]):
-    async def retrieve(db, org_id, request):
+    async def retrieve(db, org_id, request, scope=None):
         calls.append(request.strategy)
         return RetrievalResult(
             chunks=by_strategy.get(request.strategy, []),

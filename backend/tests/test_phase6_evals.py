@@ -172,7 +172,7 @@ async def test_runner_end_to_end_and_failure_isolation():
         case(id="boom"),
     ]
 
-    async def retrieve(db, org, req, embedding_model="x"):
+    async def retrieve(db, org, req, embedding_model="x", scope=None):
         if req.query == "explode":
             raise RuntimeError("db down")
         return retrieval([rc("Refund Policy")])

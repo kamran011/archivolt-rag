@@ -1,7 +1,7 @@
 from app.models.base import Base
 from app.models.chunk import Chunk
 from app.models.conversation import Conversation
-from app.models.document import Document, DocumentStatus, FileType
+from app.models.document import Document, DocumentAccess, DocumentStatus, FileType
 from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
 from app.models.message import Message, MessageRole
 from app.models.organization import Organization
@@ -16,6 +16,7 @@ __all__ = [
     "ChunkStrategy",
     "KnowledgeBase",
     "Document",
+    "DocumentAccess",
     "DocumentStatus",
     "FileType",
     "Chunk",

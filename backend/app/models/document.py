@@ -3,7 +3,16 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, portable_jsonb
@@ -80,9 +89,28 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False, default=AuthorityTier.standard
     )
 
+    # Free-form labels for filtering (list of strings).
+    tags: Mapped[list] = mapped_column(portable_jsonb(), nullable=False, default=list)
+    # Document-level access control. False (default): every org member can see it.
+    # True: only owners/admins, the uploader, and users granted in document_access.
+    restricted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     knowledge_base: Mapped["KnowledgeBase"] = relationship(
         "KnowledgeBase", back_populates="documents"
     )
     chunks: Mapped[list["Chunk"]] = relationship(
         "Chunk", back_populates="document", cascade="all, delete-orphan"
     )
+
+
+class DocumentAccess(UUIDPrimaryKeyMixin, Base):
+    """Explicit grant letting one user see a restricted document."""
+
+    __tablename__ = "document_access"
+    __table_args__ = (UniqueConstraint("document_id", "user_id", name="uq_document_access"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True)

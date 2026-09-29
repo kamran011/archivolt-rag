@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.base import RetrievalEngine
 from app.domains.retrieval.filters import apply_common_filters
 from app.domains.retrieval.mapping import row_to_retrieved_chunk
@@ -21,6 +22,7 @@ class KeywordRetrievalEngine(RetrievalEngine):
         top_k: int,
         filters: RetrievalFilters | None = None,
         embedding_model: str = "text-embedding-3-small",
+        scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
         tsquery = func.plainto_tsquery("english", query)
         rank = func.ts_rank_cd(Chunk.fts_vector, tsquery)
@@ -34,7 +36,7 @@ class KeywordRetrievalEngine(RetrievalEngine):
                 Chunk.fts_vector.op("@@")(tsquery),
             )
         )
-        stmt = apply_common_filters(stmt, filters)
+        stmt = apply_common_filters(stmt, filters, scope)
         stmt = stmt.order_by(rank.desc()).limit(top_k)
 
         result = await db.execute(stmt)

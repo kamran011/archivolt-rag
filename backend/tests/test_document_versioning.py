@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domains.documents.service import DocumentService
+from app.domains.retrieval.access import SYSTEM_SCOPE
 from app.models.document import AuthorityTier, Document, FileType
 
 
@@ -47,7 +48,12 @@ async def test_create_new_version_marks_previous_superseded():
         "app.domains.documents.service.kb_service.increment_document_count",
         new=AsyncMock(),
     ):
-        result = await service.create_new_version(db, org_id, previous_id, file=MagicMock())
+        grants = MagicMock()
+        grants.all.return_value = []
+        db.execute = AsyncMock(return_value=grants)
+        result = await service.create_new_version(
+            db, org_id, previous_id, file=MagicMock(), scope=SYSTEM_SCOPE
+        )
 
     assert result.id == new_id
     assert result.version == 2
@@ -88,6 +94,6 @@ async def test_list_versions_returns_full_chain_oldest_to_newest():
     db.execute = AsyncMock(side_effect=fake_execute)
 
     with patch.object(service, "get", new=AsyncMock(return_value=v2)):
-        chain = await service.list_versions(db, org_id, v2_id)
+        chain = await service.list_versions(db, org_id, v2_id, scope=SYSTEM_SCOPE)
 
     assert [d.id for d in chain] == [v1_id, v2_id, v3_id]

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.keyword_engine import KeywordRetrievalEngine
 from app.domains.retrieval.engines.vector_engine import VectorRetrievalEngine
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, _encoding
@@ -93,7 +94,11 @@ class RetrievalDebugger:
         self._keyword = KeywordRetrievalEngine()
 
     async def run(
-        self, db: AsyncSession, org_id: uuid.UUID, req: DebugRequest
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        req: DebugRequest,
+        scope: AccessScope | None = None,
     ) -> DebugResponse:
         stages: list[DebugStage] = []
 
@@ -122,13 +127,13 @@ class RetrievalDebugger:
             embedding_model = settings.EMBEDDING_MODEL
             semantic = await self._vector.search(
                 db, org_id, req.query, req.knowledge_base_ids, candidate_k, req.filters,
-                embedding_model,
+                embedding_model, scope,
             )
             timed_stage("semantic", t, [_view(c) for c in semantic])
             t = time.perf_counter()
             keyword = await self._keyword.search(
                 db, org_id, req.query, req.knowledge_base_ids, candidate_k, req.filters,
-                embedding_model,
+                embedding_model, scope,
             )
             timed_stage("keyword", t, [_view(c) for c in keyword])
             t = time.perf_counter()
@@ -141,6 +146,7 @@ class RetrievalDebugger:
                     query=req.query, knowledge_base_ids=req.knowledge_base_ids,
                     strategy=route.strategy, top_k=req.top_k, filters=req.filters,
                 ),
+                scope=scope,
             )
             candidates = result.chunks
             note = (
@@ -188,7 +194,7 @@ class RetrievalDebugger:
         if gate.pass_gate:
             pool = kept
             if settings.ENABLE_NEIGHBOR_EXPANSION:
-                pool = await expand_with_neighbors(db, org_id, kept)
+                pool = await expand_with_neighbors(db, org_id, kept, scope=scope)
             context_chunks, context_tokens = ContextAssembler.assemble(pool)
             selected_ids = {c.chunk_id for c in context_chunks}
             timed_stage(
