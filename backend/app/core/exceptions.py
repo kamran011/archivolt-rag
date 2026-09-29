@@ -38,6 +38,16 @@ class ProviderError(ArchivoltError):
     pass
 
 
+class RateLimitError(ArchivoltError):
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: int = 1) -> None:
+        super().__init__(message)
+        self.retry_after = max(1, int(retry_after))
+
+
+class BudgetExceededError(ArchivoltError):
+    """The organization has used its daily LLM budget."""
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(UnauthorizedError)
     async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSONResponse:
@@ -66,3 +76,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ProviderError)
     async def provider_handler(request: Request, exc: ProviderError) -> JSONResponse:
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(RateLimitError)
+    async def rate_limit_handler(request: Request, exc: RateLimitError) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": str(exc)},
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    @app.exception_handler(BudgetExceededError)
+    async def budget_handler(request: Request, exc: BudgetExceededError) -> JSONResponse:
+        return JSONResponse(status_code=429, content={"detail": str(exc)})

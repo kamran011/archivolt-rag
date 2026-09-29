@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rate_limit import rate_limit
 from app.domains.auth.dependencies import require_org, require_role
 from app.domains.auth.schemas import CurrentUser
 from app.domains.documents.service import document_service
@@ -14,7 +15,11 @@ from app.models.organization_member import OrgRole
 router = APIRouter()
 
 
-@router.post("/documents/{doc_id}/ingest", status_code=202)
+@router.post(
+    "/documents/{doc_id}/ingest",
+    status_code=202,
+    dependencies=[Depends(rate_limit("upload", "RATE_LIMIT_UPLOAD_PER_MIN"))],
+)
 async def trigger_ingestion(
     doc_id: uuid.UUID,
     background_tasks: BackgroundTasks,
@@ -29,7 +34,11 @@ async def trigger_ingestion(
     return {"status": "queued", "document_id": str(doc_id)}
 
 
-@router.post("/documents/{doc_id}/reprocess", status_code=202)
+@router.post(
+    "/documents/{doc_id}/reprocess",
+    status_code=202,
+    dependencies=[Depends(rate_limit("upload", "RATE_LIMIT_UPLOAD_PER_MIN"))],
+)
 async def trigger_reprocess(
     doc_id: uuid.UUID,
     background_tasks: BackgroundTasks,

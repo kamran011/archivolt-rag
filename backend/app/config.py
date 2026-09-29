@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_BUCKET: str = "documents"
     MAX_UPLOAD_SIZE_MB: int = 50
+    # Per user, per organization, per minute (in-process; each worker counts separately).
+    # 0 disables the limit.
+    RATE_LIMIT_CHAT_PER_MIN: int = 20
+    RATE_LIMIT_SEARCH_PER_MIN: int = 60
+    RATE_LIMIT_UPLOAD_PER_MIN: int = 20
+    # Estimated LLM spend cap per organization per UTC day, in USD. 0 disables it.
+    ORG_DAILY_LLM_BUDGET_USD: float = 0.0
     MAX_PDF_PAGES: int = 500
 
 

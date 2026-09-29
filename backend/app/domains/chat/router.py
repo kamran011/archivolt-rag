@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, get_db
+from app.core.rate_limit import enforce_budget, rate_limit
 from app.domains.auth.dependencies import require_org
 from app.domains.auth.schemas import CurrentUser
 from app.domains.chat.schemas import (
@@ -21,7 +22,13 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.post("/")
+@router.post(
+    "/",
+    dependencies=[
+        Depends(rate_limit("chat", "RATE_LIMIT_CHAT_PER_MIN")),
+        Depends(enforce_budget),
+    ],
+)
 async def send_message(
     request: ChatRequest,
     current_user: CurrentUser = Depends(require_org),

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
+from app.core.rate_limit import org_budget
 from app.domains.chat.schemas import ChatRequest, ConversationCreate
 from app.domains.rag.schemas import RAGRequest, RAGResponse
 from app.domains.rag.service import rag_service
@@ -153,6 +154,7 @@ class ChatService:
         )
         await db.flush()
 
+        org_budget.record(org_id, rag_response.retrieval_metadata.get("estimated_cost_usd"))
         return rag_response
 
     async def send_message_stream(
@@ -190,6 +192,10 @@ class ChatService:
             else:
                 final_event = event
             yield {**event, "conversation_id": str(conv.id)}
+
+        org_budget.record(
+            org_id, (final_event.get("cost_metadata") or {}).get("estimated_cost_usd")
+        )
 
         db.add(
             Message(

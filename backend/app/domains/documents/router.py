@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rate_limit import rate_limit
 from app.domains.auth.dependencies import require_org, require_role
 from app.domains.auth.schemas import CurrentUser
 from app.domains.documents.schemas import (
@@ -19,7 +20,12 @@ from app.models.organization_member import OrgRole
 router = APIRouter()
 
 
-@router.post("/upload", response_model=DocumentResponse, status_code=201)
+@router.post(
+    "/upload",
+    response_model=DocumentResponse,
+    status_code=201,
+    dependencies=[Depends(rate_limit("upload", "RATE_LIMIT_UPLOAD_PER_MIN"))],
+)
 async def upload_document(
     kb_id: uuid.UUID,
     background_tasks: BackgroundTasks,
@@ -76,7 +82,12 @@ async def update_document(
     return DocumentResponse.model_validate(doc)
 
 
-@router.post("/{doc_id}/versions", response_model=DocumentResponse, status_code=201)
+@router.post(
+    "/{doc_id}/versions",
+    response_model=DocumentResponse,
+    status_code=201,
+    dependencies=[Depends(rate_limit("upload", "RATE_LIMIT_UPLOAD_PER_MIN"))],
+)
 async def create_document_version(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
