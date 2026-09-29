@@ -67,6 +67,8 @@ def sniff_content(content: bytes, file_type: FileType) -> None:
             raise ValidationError("File content is not a valid PDF")
     elif file_type == FileType.docx:
         _check_docx(content)
+    elif file_type == FileType.image:
+        _check_image(content)
     elif file_type in TEXT_TYPES:
         if b"\x00" in content[:8192]:
             raise ValidationError(f"File content is binary, not valid {file_type.value} text")
@@ -86,3 +88,11 @@ def _check_docx(content: bytes) -> None:
                 raise ValidationError("File content is not a valid DOCX")
     except zipfile.BadZipFile as e:
         raise ValidationError("File content is not a valid DOCX") from e
+
+
+def _check_image(content: bytes) -> None:
+    is_png = content.startswith(b"\x89PNG\r\n\x1a\n")
+    is_jpeg = content.startswith(b"\xff\xd8\xff")
+    is_webp = content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    if not (is_png or is_jpeg or is_webp):
+        raise ValidationError("File content is not a valid PNG, JPEG or WebP image")

@@ -30,6 +30,7 @@ class FileType(str, Enum):
     html = "html"
     csv = "csv"
     json = "json"
+    image = "image"
 
 
 class DocumentStatus(str, Enum):

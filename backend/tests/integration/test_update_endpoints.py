@@ -107,3 +107,53 @@ async def test_document_inspection_endpoints_and_isolation(env):  # noqa: F811
         other = f"/api/v1/knowledge-bases/{kb2}/documents/{doc}"
         assert (await c.get(f"{other}/chunks", headers=h2)).status_code == 404
         assert (await c.get(f"{other}/tree", headers=h2)).status_code == 404
+
+
+async def test_image_upload_ingests_via_ocr_and_is_searchable(env, monkeypatch):  # noqa: F811
+    import pymupdf as fitz
+
+    from app.config import settings
+    from app.domains.ingestion.parsers import image_parser as image_parser_module
+    from app.providers.ocr.base import OCRProvider, OCRResult
+
+    class FakeOCR(OCRProvider):
+        async def read(self, image_png):
+            return OCRResult(text="# Receipt\n\nRefund issued: 45 EUR to customer zebra", model="v")
+
+    monkeypatch.setattr(settings, "ENABLE_VISION_INGESTION", True)
+    monkeypatch.setattr(image_parser_module, "get_ocr_provider", lambda: FakeOCR())
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50), False)
+    pix.clear_with(180)
+    png = pix.tobytes("png")
+
+    _, orgs = env
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        h, kb = await onboard(c, orgs, uuid.uuid4(), f"img-{uuid.uuid4().hex[:6]}")
+        r = await c.post(
+            f"/api/v1/knowledge-bases/{kb}/documents/upload",
+            files={"file": ("receipt.png", png, "image/png")},
+            headers=h,
+        )
+        assert r.status_code == 201, r.text
+        doc = r.json()
+        assert doc["file_type"] == "image"
+        got = (await c.get(f"/api/v1/knowledge-bases/{kb}/documents/{doc['id']}", headers=h)).json()
+        assert got["status"] == "ready", got
+        assert got["parsing_metadata"]["vision_calls"] == 1
+
+        r = await c.post(
+            "/api/v1/retrieval/search",
+            json={"query": "refund zebra", "knowledge_base_ids": [kb], "strategy": "keyword"},
+            headers=h,
+        )
+        chunk = r.json()["chunks"][0]
+        assert "zebra" in chunk["content"]
+        assert "vision_ocr" in chunk["metadata"].get("derived_from", [])
+
+        # A file that only claims to be an image is rejected at upload.
+        r = await c.post(
+            f"/api/v1/knowledge-bases/{kb}/documents/upload",
+            files={"file": ("evil.png", b"<svg onload=alert(1)>", "image/png")},
+            headers=h,
+        )
+        assert r.status_code == 422, r.text

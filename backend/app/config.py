@@ -75,7 +75,8 @@ class Settings(BaseSettings):
     AGENT_TIMEOUT_S: float = 30.0
 
     # Multimodal ingestion (vision-model OCR + figure descriptions; costs per image)
-    ENABLE_VISION_INGESTION: bool = False
+    ENABLE_VISION_INGESTION: bool = False  # also gates image-file ingestion (OCR)
+    OCR_PROVIDER: str = "vision"
     VISION_MODEL: str = "gpt-4o"
     MAX_VISION_CALLS_PER_DOC: int = 30
     MIN_FIGURE_PIXELS: int = 150  # skip embedded images smaller than this on either side

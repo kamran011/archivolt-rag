@@ -36,6 +36,10 @@ ALLOWED_EXTENSIONS: dict[str, FileType] = {
     ".htm": FileType.html,
     ".csv": FileType.csv,
     ".json": FileType.json,
+    ".png": FileType.image,
+    ".jpg": FileType.image,
+    ".jpeg": FileType.image,
+    ".webp": FileType.image,
 }
 
 
