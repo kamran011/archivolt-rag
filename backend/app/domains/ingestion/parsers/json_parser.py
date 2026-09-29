@@ -9,11 +9,13 @@ from typing import Any
 from app.core.exceptions import IngestionError
 from app.domains.ingestion.chunkers.table import rows_to_markdown
 from app.domains.ingestion.parsers.base import BaseParser
+from app.domains.ingestion.records import build_records
 from app.domains.ingestion.schemas import DocumentElement, ParsedDocument, ParsedPage
 
 MAX_DEPTH = 8
 MAX_ELEMENTS = 20_000
 MAX_VALUE_CHARS = 2_000
+MAX_RECORDS = 20_000
 
 
 def _scalar(v: Any) -> str:
@@ -90,8 +92,17 @@ class JSONParser(BaseParser):
         walker.walk(data, title, 0)
         if not walker.elements:
             raise IngestionError("JSON contains no content")
+        metadata: dict = {"source": "json"}
+        records: list[dict] = []
+        if _is_record_list(data):  # a top-level list of flat records is a table
+            cols = list(dict.fromkeys(c for rec in data for c in rec))
+            names, records = build_records(
+                cols, [[rec.get(c) for c in cols] for rec in data[:MAX_RECORDS]]
+            )
+            metadata.update(column_names=names, rows=len(records))
         return ParsedDocument(
             title=title,
             pages=[ParsedPage(page_number=1, elements=walker.elements)],
-            metadata={"source": "json"},
+            metadata=metadata,
+            records=records,
         )

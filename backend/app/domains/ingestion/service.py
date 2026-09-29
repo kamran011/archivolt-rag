@@ -1,7 +1,7 @@
 import uuid
 
 import structlog
-from sqlalchemy import delete
+from sqlalchemy import delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -14,6 +14,7 @@ from app.domains.ingestion.summary_index import build_summary_rows
 from app.domains.retrieval.tree import build_tree, tree_to_json
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
+from app.models.document_row import DocumentRow
 from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
 from app.models.summary import DocumentSummary
 from app.providers.cost import estimate_embedding_cost, estimate_llm_cost
@@ -137,6 +138,7 @@ class IngestionService:
                     )
                 )
             db.add_all(chunk_rows)
+            await self._store_rows(db, document, parsed.records)
 
             # Document tree (heading outline -> chunk indices) for tree navigation.
             # Stored in parsing_metadata; no dedicated table.
@@ -204,10 +206,30 @@ class IngestionService:
             await db.flush()
             raise
 
+    async def _store_rows(self, db: AsyncSession, document: Document, records: list[dict]) -> None:
+        """Keep tabular rows in queryable form (structured_query). Bulk insert in batches."""
+        if not records:
+            return
+        for start in range(0, len(records), 1000):
+            await db.execute(
+                insert(DocumentRow),
+                [
+                    {
+                        "organization_id": document.organization_id,
+                        "knowledge_base_id": document.knowledge_base_id,
+                        "document_id": document.id,
+                        "row_index": start + i,
+                        "data": rec,
+                    }
+                    for i, rec in enumerate(records[start : start + 1000])
+                ],
+            )
+
     async def reprocess_document(self, db: AsyncSession, doc_id: uuid.UUID) -> None:
         # Remove existing chunks before re-running the pipeline
         await db.execute(delete(Chunk).where(Chunk.document_id == doc_id))
         await db.execute(delete(DocumentSummary).where(DocumentSummary.document_id == doc_id))
+        await db.execute(delete(DocumentRow).where(DocumentRow.document_id == doc_id))
         document = await db.get(Document, doc_id)
         if document:
             document.status = DocumentStatus.pending

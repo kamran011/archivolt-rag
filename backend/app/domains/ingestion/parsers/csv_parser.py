@@ -11,6 +11,7 @@ import io
 from app.core.exceptions import IngestionError
 from app.domains.ingestion.chunkers.table import rows_to_markdown
 from app.domains.ingestion.parsers.base import BaseParser
+from app.domains.ingestion.records import build_records
 from app.domains.ingestion.schemas import DocumentElement, ParsedDocument, ParsedPage
 
 MAX_ROWS = 20_000
@@ -50,6 +51,7 @@ class CSVParser(BaseParser):
 
         table = rows_to_markdown(rows)
         title = file_name.rsplit(".", 1)[0]
+        columns, records = build_records(rows[0], rows[1:])
         return ParsedDocument(
             title=title,
             pages=[
@@ -68,6 +70,8 @@ class CSVParser(BaseParser):
                 "source": "csv",
                 "rows": len(rows) - 1,
                 "columns": len(rows[0]),
+                "column_names": columns,
                 "truncated": truncated,
             },
+            records=records,
         )
