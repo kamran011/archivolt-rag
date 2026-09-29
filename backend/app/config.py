@@ -48,6 +48,11 @@ class Settings(BaseSettings):
 
     # Advanced retrieval
     ENABLE_ADAPTIVE_ROUTING: bool = True
+    # Sufficiency gate: does the evidence cover what the question needs?
+    ENABLE_SUFFICIENCY_GATE: bool = True
+    SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence
+    SUFFICIENCY_HIGH_CONFIDENCE: float = 0.8  # a reranker score this high overrides lexical gaps
+    MAX_RETRIEVAL_EXPANSIONS: int = 2  # extra strategies tried when evidence is insufficient
     # Documents still in an in-flight ingestion status after this long are marked failed.
     INGESTION_STUCK_AFTER_MINUTES: int = 30
     # If the claim verifier itself fails, abstain instead of returning the answer flagged

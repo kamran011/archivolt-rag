@@ -27,12 +27,14 @@ from app.domains.rag.schemas import (
     VerificationStatus,
 )
 from app.domains.rag.stages import build_stages
+from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
-from app.domains.retrieval.evidence_gate import EvidenceGate
+from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
 from app.domains.retrieval.expansion import expand_with_neighbors
 from app.domains.retrieval.query_router import RouteDecision, query_router
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
+from app.domains.retrieval.sufficiency import SufficiencyResult, evaluate_sufficiency
 from app.providers.cost import estimate_llm_cost
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.registry import get_llm_provider
@@ -86,6 +88,121 @@ async def _retrieve_candidates(
         ),
     )
     return _Retrieved(result.chunks, result.retrieval_time_ms, result.strategy)
+
+
+@dataclass
+class _Evidence:
+    """Everything the retrieve -> rerank -> filter -> gates stages produced."""
+
+    retrieval: _Retrieved
+    candidates: list[RetrievedChunk]
+    reranked: list[RetrievedChunk]
+    after_score: list[RetrievedChunk]
+    filtered: list[RetrievedChunk]
+    gate: EvidenceGateResult
+    analysis: QueryAnalysis
+    sufficiency: SufficiencyResult
+    strategies_tried: list[str]
+
+    @property
+    def passed(self) -> bool:
+        return self.gate.pass_gate and self.sufficiency.sufficient
+
+    @property
+    def abstention_reason(self) -> AbstentionReason:
+        if self.gate.pass_gate and self.sufficiency.failure_kind == "outdated":
+            return AbstentionReason.outdated
+        return AbstentionReason.insufficient_evidence
+
+    @property
+    def abstention_detail(self) -> str | None:
+        return self.gate.reason if not self.gate.pass_gate else self.sufficiency.reason
+
+
+def _expansion_ladder(first: str, request: RAGRequest) -> list[RouteDecision]:
+    """Strategies to try, in order, when the first attempt is insufficient. Never repeats a
+    strategy already tried, and never runs everything: capped by MAX_RETRIEVAL_EXPANSIONS."""
+    order: list[RouteDecision] = [
+        RouteDecision(strategy="hybrid", reason="expand: hybrid"),
+        RouteDecision(strategy="tree", reason="expand: document tree"),
+    ]
+    ladder = [r for r in order if r.strategy != first]
+    return ladder[: max(0, settings.MAX_RETRIEVAL_EXPANSIONS)]
+
+
+def _merge_candidates(
+    existing: list[RetrievedChunk], new: list[RetrievedChunk]
+) -> list[RetrievedChunk]:
+    seen = {c.chunk_id for c in existing}
+    return existing + [c for c in new if c.chunk_id not in seen]
+
+
+async def _gather_evidence(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    trace: RetrievalTrace,
+) -> _Evidence:
+    """Retrieve, rerank, filter and check the evidence; when the sufficiency gate says it
+    is not enough, widen retrieval with another strategy (bounded) before giving up.
+    Every candidate still comes from org-scoped queries, so expansion cannot widen access."""
+    analysis = analyze_query(request.query)
+    with trace.span(
+        "query_analysis",
+        intent=analysis.intent,
+        terms=analysis.terms,
+        requirements=[r.description for r in analysis.requirements],
+    ):
+        pass
+
+    with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
+        retrieval = await _retrieve_candidates(db, org_id, request, route)
+    candidates = list(retrieval.chunks)
+    tried = [retrieval.strategy]
+
+    ladder = _expansion_ladder(retrieval.strategy, request) if not request.agentic else []
+    attempt = 0
+    while True:
+        with trace.span("rerank", candidates_in=len(candidates)):
+            reranked = await _reranker.rerank(request.query, candidates, top_k=10)
+        with trace.span("filter", candidates_in=len(reranked)):
+            after_score = EvidenceFilter.filter_by_score(reranked)
+            filtered = EvidenceFilter.deduplicate(after_score)
+        with trace.span("evidence_gate", candidates=len(filtered)):
+            gate = EvidenceGate.evaluate(request.query, filtered)
+        with trace.span("sufficiency_gate", attempt=attempt) as span:
+            if settings.ENABLE_SUFFICIENCY_GATE and gate.pass_gate:
+                sufficiency = evaluate_sufficiency(analysis, filtered)
+            else:
+                sufficiency = SufficiencyResult(sufficient=True, coverage=1.0, missing=[])
+            span.attributes.update(
+                sufficient=sufficiency.sufficient,
+                coverage=round(sufficiency.coverage, 2),
+                missing=sufficiency.missing,
+            )
+
+        done = (gate.pass_gate and sufficiency.sufficient) or attempt >= len(ladder)
+        if done:
+            break
+        step = ladder[attempt]
+        attempt += 1
+        with trace.span("retrieval_expansion", strategy=step.strategy, attempt=attempt):
+            extra = await _retrieve_candidates(db, org_id, request, step)
+        tried.append(extra.strategy)
+        candidates = _merge_candidates(candidates, extra.chunks)
+
+    return _Evidence(
+        retrieval=retrieval,
+        candidates=candidates,
+        reranked=reranked,
+        after_score=after_score,
+        filtered=filtered,
+        gate=gate,
+        analysis=analysis,
+        sufficiency=sufficiency,
+        strategies_tried=tried,
+    )
 
 
 def _route_query(query: str) -> RouteDecision:
@@ -239,23 +356,11 @@ class RAGService:
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        # 1. Retrieve
-        with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-            retrieval_result = await _retrieve_candidates(db, org_id, request, route)
-        candidates = retrieval_result.chunks
-
-        # 2. Rerank
-        with trace.span("rerank", candidates_in=len(candidates)):
-            reranked = await _reranker.rerank(request.query, candidates, top_k=10)
-
-        # 3. Filter
-        with trace.span("filter", candidates_in=len(reranked)):
-            after_score = EvidenceFilter.filter_by_score(reranked)
-            filtered = EvidenceFilter.deduplicate(after_score)
-
-        # 4. Evidence gate
-        with trace.span("evidence_gate", candidates=len(filtered)):
-            gate_result = EvidenceGate.evaluate(request.query, filtered)
+        # 1-4. Retrieve, rerank, filter, evidence + sufficiency gates (with bounded expansion)
+        ev = await _gather_evidence(db, org_id, request, route, trace)
+        retrieval_result, candidates = ev.retrieval, ev.candidates
+        reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
+        gate_result = ev.gate
 
         retrieval_metadata = {
             "retrieval_time_ms": retrieval_result.retrieval_time_ms,
@@ -263,19 +368,22 @@ class RAGService:
             "candidates_after_rerank": len(reranked),
             "candidates_after_filter": len(filtered),
             "strategy": retrieval_result.strategy,
+            "strategies_tried": ev.strategies_tried,
+            "query_intent": ev.analysis.intent,
+            "sufficiency": ev.sufficiency.model_dump(),
         }
         if retrieval_result.agent:
             retrieval_metadata["agent"] = retrieval_result.agent.summary()
 
-        if not gate_result.pass_gate:
-            trace_id = trace.finish(abstained=True, reason=gate_result.reason)["trace_id"]
+        if not ev.passed:
+            trace_id = trace.finish(abstained=True, reason=ev.abstention_detail)["trace_id"]
             return RAGResponse(
-                answer=ABSTENTION_TEMPLATE.format(reason=gate_result.reason),
+                answer=ABSTENTION_TEMPLATE.format(reason=ev.abstention_detail),
                 citations=[],
                 claim_verifications=[],
                 evidence_gate=gate_result,
                 abstained=True,
-                abstention_reason=AbstentionReason.insufficient_evidence,
+                abstention_reason=ev.abstention_reason,
                 retrieval_metadata={**retrieval_metadata, "trace_id": trace_id},
                 trace_stages={
                     **build_stages(
@@ -377,33 +485,25 @@ class RAGService:
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-            retrieval_result = await _retrieve_candidates(db, org_id, request, route)
+        ev = await _gather_evidence(db, org_id, request, route, trace)
+        retrieval_result = ev.retrieval
+        reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
+        gate_result = ev.gate
 
-        with trace.span("rerank", candidates_in=len(retrieval_result.chunks)):
-            reranked = await _reranker.rerank(request.query, retrieval_result.chunks, top_k=10)
-
-        with trace.span("filter", candidates_in=len(reranked)):
-            after_score = EvidenceFilter.filter_by_score(reranked)
-            filtered = EvidenceFilter.deduplicate(after_score)
-
-        with trace.span("evidence_gate", candidates=len(filtered)):
-            gate_result = EvidenceGate.evaluate(request.query, filtered)
-
-        if not gate_result.pass_gate:
-            trace_id = trace.finish(abstained=True, reason=gate_result.reason)["trace_id"]
-            abstention_text = ABSTENTION_TEMPLATE.format(reason=gate_result.reason)
+        if not ev.passed:
+            trace_id = trace.finish(abstained=True, reason=ev.abstention_detail)["trace_id"]
+            abstention_text = ABSTENTION_TEMPLATE.format(reason=ev.abstention_detail)
             yield {"type": "token", "content": abstention_text}
             yield {
                 "type": "done",
                 "abstained": True,
-                "abstention_reason": AbstentionReason.insufficient_evidence.value,
+                "abstention_reason": ev.abstention_reason.value,
                 "citations": [],
                 "evidence_gate": gate_result.model_dump(),
                 "trace_id": trace_id,
                 "trace_stages": {
                     **build_stages(
-                        candidates=retrieval_result.chunks,
+                        candidates=ev.candidates,
                         reranked=reranked,
                         after_score=after_score,
                         filtered=filtered,
@@ -465,7 +565,7 @@ class RAGService:
         )
 
         trace_stages = build_stages(
-            candidates=retrieval_result.chunks,
+            candidates=ev.candidates,
             reranked=reranked,
             after_score=after_score,
             filtered=filtered_before_expansion,
