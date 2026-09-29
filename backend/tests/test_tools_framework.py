@@ -301,4 +301,6 @@ async def test_calculator_tool_through_executor():
     assert ok.ok and ok.content == "1200 * 0.15 = 180.0" and ok.chunks == []
     bad = await ex.call("calculator", {"expression": "__import__('os')"})
     assert not bad.ok and "calculator" in bad.error
-    assert statuses(ex) == [("calculator", "ok"), ("calculator", "ok")]  # tool ran, returned error
+    # The tool ran but rejected the input: audited as an error, with the reason.
+    assert statuses(ex) == [("calculator", "ok"), ("calculator", "error")]
+    assert "not a valid" in ex.audit[1].detail or "unsupported" in ex.audit[1].detail

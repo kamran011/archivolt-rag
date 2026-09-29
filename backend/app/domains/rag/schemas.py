@@ -14,6 +14,7 @@ class RAGRequest(BaseModel):
     model: str = "gpt-4o"
     temperature: float = 0.1
     agentic: bool = False
+    web_search: bool = False  # the user asked to allow external web results
 
 
 class Citation(BaseModel):
@@ -24,6 +25,9 @@ class Citation(BaseModel):
     content: str
     page_number: int | None = None
     relevance_score: float
+    # 'internal' (the knowledge base) or 'external' (public web); url only for external.
+    source_type: str = "internal"
+    url: str | None = None
 
 
 class AbstentionReason(str, Enum):

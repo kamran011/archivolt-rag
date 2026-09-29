@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     model: str = "gpt-4o"
     stream: bool = True
     agentic: bool = False
+    web_search: bool = False  # allow external web results (still needs org opt-in)
 
 
 class ConversationCreate(BaseModel):

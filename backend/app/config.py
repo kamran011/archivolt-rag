@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     AGENT_MAX_STEPS: int = 4
     AGENT_MAX_TOKENS: int = 8000  # total planner tokens (prompt + completion) per run
     AGENT_TIMEOUT_S: float = 30.0
+    # Web search is an explicitly controlled external source. It only runs when ALL hold:
+    # this flag, the organization's admin opt-in (settings.web_search_enabled) and the
+    # user's per-request toggle. Only the search query leaves the system.
+    ENABLE_WEB_SEARCH: bool = False
+    WEB_SEARCH_PROVIDER: str = "brave"  # brave | none
+    BRAVE_API_KEY: str = ""
+    WEB_SEARCH_MAX_RESULTS: int = 5
     TOOL_TIMEOUT_S: float = 10.0  # default per-call timeout for agent tools
 
     # Multimodal ingestion (vision-model OCR + figure descriptions; costs per image)

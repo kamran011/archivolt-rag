@@ -152,6 +152,7 @@ class RetrievalAgent:
         user_id: uuid.UUID | None = None,
         role: OrgRole | None = None,
         org_settings: dict | None = None,
+        web_search: bool = False,
         registry: ToolRegistry | None = None,
     ) -> AgentResult:
         start = time.perf_counter()
@@ -167,6 +168,7 @@ class RetrievalAgent:
                 user_id=user_id,
                 role=role,
                 org_settings=org_settings or {},
+                web_search_requested=web_search,
             ),
         )
         try:

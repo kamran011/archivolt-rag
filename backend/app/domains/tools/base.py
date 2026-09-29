@@ -44,6 +44,8 @@ class ToolContext:
     user_id: uuid.UUID | None = None
     role: OrgRole | None = None
     org_settings: dict = field(default_factory=dict)
+    # The user explicitly asked for web search on this request (a third, per-request switch).
+    web_search_requested: bool = False
     # Text of internal evidence gathered so far in this run (used by the web-search
     # exfiltration guard).
     internal_texts: list[str] = field(default_factory=list)
@@ -190,5 +192,8 @@ class ToolExecutor:
 
         if not tool.produces_evidence:
             result.chunks = []  # a non-evidence tool can never smuggle in citable text
-        self._record(tool.name, raw_args, "ok", started, chunks=len(result.chunks))
+        if result.ok:
+            self._record(tool.name, raw_args, "ok", started, chunks=len(result.chunks))
+        else:  # the tool ran but reported a problem (bad input, blocked query, ...)
+            self._record(tool.name, raw_args, "error", started, detail=result.error)
         return result

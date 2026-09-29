@@ -150,7 +150,7 @@ async def test_agentic_chat_runs_tools_and_persists_an_admin_readable_audit(worl
         ("knowledge_base_search", "ok"),   # step 0: search on the question itself
         ("document_lookup", "ok"),
         ("calculator", "ok"),
-        ("calculator", "ok"),               # the tool ran and reported the unsafe input as an error
+        ("calculator", "error"),            # the tool ran and rejected the unsafe input
         ("no_such_tool", "unknown_tool"),
     ]
     lookup = next(x for x in r.json() if x["tool"] == "document_lookup")

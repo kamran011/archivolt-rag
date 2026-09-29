@@ -23,6 +23,11 @@ class FilterOutcome:
     dropped: list[tuple[RetrievedChunk, str, str]] = field(default_factory=list)
 
 
+def is_external(chunk: RetrievedChunk) -> bool:
+    """True for public-web evidence (never internal, never high authority)."""
+    return chunk.metadata.get("source") == "external"
+
+
 class EvidenceFilter:
     @staticmethod
     def remove_superseded(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
@@ -36,9 +41,14 @@ class EvidenceFilter:
     def remove_low_authority(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
         """Drop draft/unreviewed evidence whenever reviewed (standard/authoritative)
         evidence is present. Drafts are kept when they are all there is."""
-        if not any(_AUTHORITY_ORDER.get(c.authority_tier, 1) > 0 for c in chunks):
+        def reviewed(c: RetrievedChunk) -> bool:
+            return not is_external(c) and _AUTHORITY_ORDER.get(c.authority_tier, 1) > 0
+
+        if not any(reviewed(c) for c in chunks):
             return chunks
-        return [c for c in chunks if _AUTHORITY_ORDER.get(c.authority_tier, 1) > 0]
+        # External results are a different kind of source, not "unreviewed drafts": they are
+        # kept (and labelled) alongside internal evidence rather than silently dropped.
+        return [c for c in chunks if reviewed(c) or is_external(c)]
 
     @staticmethod
     def limit_per_document(
@@ -151,7 +161,10 @@ class ContextAssembler:
     def format_with_citations(chunks: list[RetrievedChunk]) -> str:
         parts = []
         for i, chunk in enumerate(chunks, start=1):
-            page = chunk.metadata.get("page_number")
-            location = f", p.{page}" if page else ""
-            parts.append(f"[Source {i} - {chunk.document_title}{location}]:\n{chunk.content}")
+            if is_external(chunk):
+                label = f"{chunk.document_title} (EXTERNAL web source: {chunk.metadata.get('url')})"
+            else:
+                page = chunk.metadata.get("page_number")
+                label = f"{chunk.document_title}{f', p.{page}' if page else ''}"
+            parts.append(f"[Source {i} - {label}]:\n{chunk.content}")
         return "\n\n".join(parts)

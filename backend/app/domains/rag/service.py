@@ -29,13 +29,15 @@ from app.domains.rag.schemas import (
 from app.domains.rag.stages import build_stages
 from app.domains.retrieval.access import AccessScope, Actor
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
-from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
+from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, is_external
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
 from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
 from app.domains.retrieval.query_router import RouteDecision, query_router
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
 from app.domains.retrieval.sufficiency import SufficiencyResult, evaluate_sufficiency
+from app.domains.tools.base import ToolContext, ToolExecutor
+from app.domains.tools.registry import default_registry
 from app.providers.cost import estimate_llm_cost
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.registry import get_llm_provider
@@ -85,6 +87,7 @@ async def _retrieve_candidates(
             user_id=actor.user_id if actor else None,
             role=actor.role if actor else None,
             org_settings=actor.org_settings if actor else None,
+            web_search=request.web_search,
         )
         return _Retrieved(
             chunks=agent.chunks[:AGENTIC_MAX_CANDIDATES],
@@ -120,6 +123,7 @@ class _Evidence:
     analysis: QueryAnalysis
     sufficiency: SufficiencyResult
     strategies_tried: list[str]
+    web_audit: list
 
     @property
     def passed(self) -> bool:
@@ -181,6 +185,8 @@ async def _gather_evidence(
     tried = [retrieval.strategy]
 
     ladder = _expansion_ladder(retrieval.strategy, request) if not request.agentic else []
+    web_executor = _web_fallback_executor(db, org_id, request, scope, actor)
+    web_pending = web_executor is not None
     attempt = 0
     while True:
         with trace.span("rerank", candidates_in=len(candidates)):
@@ -203,15 +209,28 @@ async def _gather_evidence(
                 missing=sufficiency.missing,
             )
 
-        done = (gate.pass_gate and sufficiency.sufficient) or attempt >= len(ladder)
-        if done:
+        if gate.pass_gate and sufficiency.sufficient:
             break
-        step = ladder[attempt]
-        attempt += 1
-        with trace.span("retrieval_expansion", strategy=step.strategy, attempt=attempt):
-            extra = await _retrieve_candidates(db, org_id, request, step, scope)
-        tried.append(extra.strategy)
-        candidates = _merge_candidates(candidates, extra.chunks)
+        if attempt < len(ladder):
+            step = ladder[attempt]
+            attempt += 1
+            with trace.span("retrieval_expansion", strategy=step.strategy, attempt=attempt):
+                extra = await _retrieve_candidates(db, org_id, request, step, scope)
+            tried.append(extra.strategy)
+            candidates = _merge_candidates(candidates, extra.chunks)
+            continue
+        if web_pending:
+            # Last resort, after every internal strategy: external results, clearly labelled.
+            web_pending = False
+            web_executor.ctx.internal_texts = [c.content for c in candidates if not is_external(c)]
+            with trace.span("web_search_fallback") as span:
+                result = await web_executor.call("web_search", {"query": _web_query(request.query)})
+                span.attributes.update(ok=result.ok, results=len(result.chunks))
+            if result.ok and result.chunks:
+                tried.append("web")
+                candidates = _merge_candidates(candidates, result.chunks)
+                continue
+        break
 
     return _Evidence(
         retrieval=retrieval,
@@ -224,12 +243,48 @@ async def _gather_evidence(
         analysis=analysis,
         sufficiency=sufficiency,
         strategies_tried=tried,
+        web_audit=web_executor.audit if web_executor else [],
     )
 
 
-def _tool_audit(retrieval: _Retrieved) -> list[dict]:
-    """Agent tool-call audit records, carried in the internal trace channel to persistence."""
-    return [a.model_dump(mode="json") for a in retrieval.agent.tool_audit] if retrieval.agent else []
+def _web_query(question: str, limit: int = 200) -> str:
+    q = " ".join(question.split())
+    return q if len(q) <= limit else q[:limit].rsplit(" ", 1)[0]
+
+
+def _web_fallback_executor(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    scope: AccessScope | None,
+    actor: Actor | None,
+) -> ToolExecutor | None:
+    """An executor for the web-search fallback, only when every switch allows it: the user
+    asked (request.web_search), the org opted in and the deployment enables it. Agentic
+    runs get web_search as a planner tool instead of this fallback."""
+    if request.agentic or not request.web_search or actor is None:
+        return None
+    ctx = ToolContext(
+        db=db,
+        org_id=org_id,
+        kb_ids=request.knowledge_base_ids,
+        scope=scope,
+        user_id=actor.user_id,
+        role=actor.role,
+        org_settings=actor.org_settings,
+        web_search_requested=True,
+    )
+    tool = default_registry.get("web_search")
+    if tool is None or tool.denied_reason(ctx) is not None:
+        return None
+    return ToolExecutor(default_registry, ctx)
+
+
+def _tool_audit(ev: _Evidence) -> list[dict]:
+    """Tool-call audit records (agent tools and the web fallback), carried in the internal
+    trace channel to persistence."""
+    agent = ev.retrieval.agent.tool_audit if ev.retrieval.agent else []
+    return [a.model_dump(mode="json") for a in [*agent, *ev.web_audit]]
 
 
 def _route_query(query: str) -> RouteDecision:
@@ -426,7 +481,7 @@ class RAGService:
                     ),
                     "meta": {
                         "strategy": retrieval_result.strategy,
-                        "tool_audit": _tool_audit(retrieval_result),
+                        "tool_audit": _tool_audit(ev),
                     },
                 },
             )
@@ -496,7 +551,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
-            "tool_audit": _tool_audit(retrieval_result),
+            "tool_audit": _tool_audit(ev),
         }
 
         return RAGResponse(
@@ -552,7 +607,7 @@ class RAGService:
                     ),
                     "meta": {
                         "strategy": retrieval_result.strategy,
-                        "tool_audit": _tool_audit(retrieval_result),
+                        "tool_audit": _tool_audit(ev),
                     },
                 },
             }
@@ -622,7 +677,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
-            "tool_audit": _tool_audit(retrieval_result),
+            "tool_audit": _tool_audit(ev),
         }
 
         yield {
