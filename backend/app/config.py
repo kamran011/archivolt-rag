@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     RERANK_TOP_K: int = 10
     MIN_RELEVANCE_SCORE: float = 0.25
     SCORE_FILTER_THRESHOLD: float = 0.3
+    CHUNKING_MODEL: str = "gpt-4o-mini"  # used by the agentic chunker
+    MAX_AGENTIC_CHUNK_CALLS: int = 20  # LLM calls per document for agentic chunking
     MAX_CHUNKS_PER_DOCUMENT: int = 4  # 0 disables the per-document diversity cap
     MAX_CONTEXT_TOKENS: int = 4096
 

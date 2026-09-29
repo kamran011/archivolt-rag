@@ -157,3 +157,69 @@ async def test_image_upload_ingests_via_ocr_and_is_searchable(env, monkeypatch):
             headers=h,
         )
         assert r.status_code == 422, r.text
+
+
+async def test_kb_with_semantic_strategy_ingests_and_records_how_chunks_were_made(
+    env,  # noqa: F811
+    monkeypatch,
+):
+    from sqlalchemy import text
+
+    _, orgs = env
+    billing = " ".join(f"Billing sentence {i} covers invoices and refunds." for i in range(40))
+    shipping = " ".join(f"Shipping sentence {i} covers carriers and delivery." for i in range(40))
+
+    async def semantic_embed(texts):
+        # ingestion's fake embedder is in the `env` fixture; this one also sees sentences
+        return [[1.0] + [0.0] * 1535 if "Billing" in t else [0.0, 1.0] + [0.0] * 1534 for t in texts]
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        h, _ = await onboard(c, orgs, uuid.uuid4(), f"sem-{uuid.uuid4().hex[:6]}")
+        r = await c.post(
+            "/api/v1/knowledge-bases/",
+            json={"name": "Semantic KB", "chunk_strategy": "semantic", "chunk_size": 128,
+                  "chunk_overlap": 0},
+            headers=h,
+        )
+        assert r.status_code == 201, r.text
+        kb = r.json()["id"]
+        assert r.json()["chunk_strategy"] == "semantic"
+
+        from app.domains.ingestion import service as ingestion_module
+
+        real = ingestion_module.get_embedding_provider
+
+        class Provider:
+            def __init__(self, inner):
+                self._inner = inner
+
+            async def embed_texts(self, texts):
+                return await semantic_embed(texts)
+
+            async def embed_query(self, t):
+                return await self._inner.embed_query(t)
+
+        monkeypatch.setattr(ingestion_module, "get_embedding_provider", lambda m: Provider(real(m)))
+
+        md = f"# Operations\n\n{billing} {shipping}\n".encode()
+        r = await c.post(
+            f"/api/v1/knowledge-bases/{kb}/documents/upload",
+            files={"file": ("ops.md", md, "text/markdown")},
+            headers=h,
+        )
+        assert r.status_code == 201, r.text
+        doc = (await c.get(f"/api/v1/knowledge-bases/{kb}/documents/{r.json()['id']}", headers=h)).json()
+        assert doc["status"] == "ready", doc
+        assert doc["chunk_count"] >= 2
+
+    maker, _ = env
+    async with maker() as s:
+        rows = (
+            await s.execute(
+                text("SELECT metadata->'chunking'->>'strategy', metadata->>'semantic_split' "
+                     "FROM chunks WHERE knowledge_base_id = :k"),
+                {"k": kb},
+            )
+        ).all()
+    assert {r[0] for r in rows} == {"semantic"}
+    assert any(r[1] == "true" for r in rows), "no chunk was produced by a semantic split"

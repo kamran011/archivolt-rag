@@ -20,6 +20,16 @@ class BaseChunker(ABC):
     ) -> list[ChunkData]:
         raise NotImplementedError
 
+    async def achunk(
+        self,
+        parsed: ParsedDocument,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[ChunkData]:
+        """Async entry point used by ingestion. Chunkers that need embeddings or an LLM
+        override this; the rest just run synchronously."""
+        return self.chunk(parsed, chunk_size, chunk_overlap)
+
     def count_tokens(self, text: str) -> int:
         return len(_encoding.encode(text))
 

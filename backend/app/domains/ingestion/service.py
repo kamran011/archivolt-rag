@@ -13,9 +13,10 @@ from app.domains.ingestion.summarizer import summarize_tree
 from app.domains.retrieval.tree import build_tree, tree_to_json
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
-from app.models.knowledge_base import KnowledgeBase
+from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
 from app.providers.cost import estimate_embedding_cost, estimate_llm_cost
 from app.providers.embeddings.registry import get_embedding_provider
+from app.providers.llm.registry import get_llm_provider
 from app.security.prompt_injection import scan_for_injection_patterns
 
 logger = structlog.get_logger()
@@ -64,8 +65,17 @@ class IngestionService:
             document.status = DocumentStatus.chunking
             await db.flush()
 
-            chunker = get_chunker(kb.chunk_strategy)
-            chunk_data_list = chunker.chunk(parsed, kb.chunk_size, kb.chunk_overlap)
+            embedding_provider = get_embedding_provider(kb.embedding_model)
+            chunker = get_chunker(
+                kb.chunk_strategy,
+                embed=embedding_provider.embed_texts,
+                llm=(
+                    get_llm_provider(settings.CHUNKING_MODEL)
+                    if kb.chunk_strategy == ChunkStrategy.agentic
+                    else None
+                ),
+            )
+            chunk_data_list = await chunker.achunk(parsed, kb.chunk_size, kb.chunk_overlap)
 
             if not chunk_data_list:
                 if parsed.metadata.get("scanned_pages") and not settings.ENABLE_VISION_INGESTION:
@@ -79,10 +89,16 @@ class IngestionService:
             document.status = DocumentStatus.embedding
             await db.flush()
 
-            embedding_provider = get_embedding_provider(kb.embedding_model)
             texts = [c.content for c in chunk_data_list]
             embeddings = await embedding_provider.embed_texts(texts)
             embedding_token_total = sum(c.token_count for c in chunk_data_list)
+            # Semantic chunking embeds sentences of split sections a second time.
+            embedding_token_total += getattr(chunker, "embedding_tokens", 0)
+            chunking_llm_cost = 0.0
+            if getattr(chunker, "calls", 0):
+                chunking_llm_cost = estimate_llm_cost(
+                    chunker.prompt_tokens, chunker.completion_tokens, settings.CHUNKING_MODEL
+                )
 
             # 5. Index — bulk insert chunks with embeddings
             chunk_rows = []
@@ -134,6 +150,14 @@ class IngestionService:
                 "tree": tree_to_json(tree_nodes),
                 **({"injection_flagged_chunks": flagged_chunk_count} if flagged_chunk_count else {}),
                 "embedding_tokens": embedding_token_total,
+                **(
+                    {
+                        "chunking_llm_calls": chunker.calls,
+                        "chunking_llm_cost_usd": round(chunking_llm_cost, 6),
+                    }
+                    if chunking_llm_cost
+                    else {}
+                ),
                 "embedding_cost_usd": round(
                     estimate_embedding_cost(embedding_token_total, kb.embedding_model), 6
                 ),

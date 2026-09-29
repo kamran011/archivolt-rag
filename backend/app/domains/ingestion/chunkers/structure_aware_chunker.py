@@ -102,6 +102,8 @@ class StructureAwareChunker(BaseChunker):
                                 "page_number": sub.metadata.get("page_number", page_num),
                                 "section_types": section_types,
                                 "split_from_oversized_section": True,
+                                # keep how the sub-chunk was made (e.g. semantic_split)
+                                **{k: v for k, v in sub.metadata.items() if k != "page_number"},
                                 **extra_meta,
                             },
                         )

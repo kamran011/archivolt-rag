@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 class ChunkStrategy(str, Enum):
     fixed = "fixed"
     structure_aware = "structure_aware"
+    semantic = "semantic"
+    agentic = "agentic"
 
 
 class KBStatus(str, Enum):
