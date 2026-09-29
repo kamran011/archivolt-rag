@@ -24,6 +24,12 @@ async def lifespan(app: FastAPI):
         logger.info("database_connected")
     except Exception as e:
         logger.error("database_connection_failed", error=str(e))
+    try:
+        from app.domains.ingestion.background import recover_stuck_ingestions
+
+        await recover_stuck_ingestions()
+    except Exception as e:
+        logger.error("stuck_ingestion_recovery_failed", error=str(e))
     yield
     await engine.dispose()
 

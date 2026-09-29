@@ -47,6 +47,8 @@ class Settings(BaseSettings):
 
     # Advanced retrieval
     ENABLE_ADAPTIVE_ROUTING: bool = True
+    # Documents still in an in-flight ingestion status after this long are marked failed.
+    INGESTION_STUCK_AFTER_MINUTES: int = 30
     # If the claim verifier itself fails, abstain instead of returning the answer flagged
     # as 'unverified'.
     REQUIRE_VERIFICATION: bool = False

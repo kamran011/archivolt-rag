@@ -38,22 +38,9 @@ async def trigger_reprocess(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.domains.ingestion.service import ingestion_service
-
     await document_service.get(db, current_user.organization_id, doc_id)
 
-    async def _reprocess():
-        from app.core.database import AsyncSessionLocal
-
-        async with AsyncSessionLocal() as session:
-            try:
-                await ingestion_service.reprocess_document(session, doc_id)
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-
-    background_tasks.add_task(_reprocess)
+    background_tasks.add_task(run_ingestion, doc_id, True)
     return {"status": "queued", "document_id": str(doc_id)}
 
 
