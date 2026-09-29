@@ -49,6 +49,24 @@ function ConflictNotice({ message }: { message: ChatMessage }) {
   );
 }
 
+function VerificationNotice({ message }: { message: ChatMessage }) {
+  if (message.verificationStatus === "unverified") {
+    return (
+      <p className="mt-2 text-[11px] text-amber-700">
+        This answer could not be checked against the sources - please verify it.
+      </p>
+    );
+  }
+  if (message.verificationStatus === "partial") {
+    return (
+      <p className="mt-2 text-[11px] text-text-muted">
+        Some statements were removed because the sources did not support them.
+      </p>
+    );
+  }
+  return null;
+}
+
 export default function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
@@ -77,6 +95,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
       <div className="max-w-[75%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm whitespace-pre-wrap bg-bg text-text">
         {renderContentWithCitations(message)}
         <ConflictNotice message={message} />
+        <VerificationNotice message={message} />
         {message.agent && (
           <p className="mt-2 text-[11px] text-text-muted">
             Deep research: {message.agent.steps.filter((s) => s.action !== "finish").length}{" "}

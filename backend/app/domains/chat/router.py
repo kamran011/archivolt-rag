@@ -1,6 +1,7 @@
 import json
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from app.domains.chat.schemas import (
 )
 from app.domains.chat.service import chat_service
 
+logger = structlog.get_logger()
 router = APIRouter()
 
 
@@ -44,7 +46,11 @@ async def _stream_response(org_id: uuid.UUID, user_id: uuid.UUID, request: ChatR
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             await db.rollback()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Log the detail server-side; never send exception text (DB/provider
+            # internals) to the client.
+            logger.error("chat_stream_failed", error=str(e), org_id=str(org_id))
+            message = "Something went wrong while generating the answer. Please try again."
+            yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
 
 
 @router.get("/conversations", response_model=list[ConversationResponse])

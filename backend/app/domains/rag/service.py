@@ -10,11 +10,22 @@ from app.config import settings
 from app.core.tracing import RetrievalTrace
 from app.domains.agent.retrieval_agent import AgentResult, retrieval_agent
 from app.domains.rag.citation_parser import CitationParser
-from app.domains.rag.claim_verifier import claim_verifier
+from app.domains.rag.claim_verifier import VerificationOutcome, claim_verifier
 from app.domains.rag.conflict_detector import conflict_detector
 from app.domains.rag.conflict_resolver import ConflictResolver
-from app.domains.rag.prompts import ABSTENTION_TEMPLATE, build_context_prompt
-from app.domains.rag.schemas import ConflictInfo, RAGRequest, RAGResponse
+from app.domains.rag.prompts import (
+    ABSTENTION_TEMPLATE,
+    REWRITE_SUPPORTED_ONLY_PROMPT,
+    build_context_prompt,
+)
+from app.domains.rag.schemas import (
+    AbstentionReason,
+    ClaimVerification,
+    ConflictInfo,
+    RAGRequest,
+    RAGResponse,
+    VerificationStatus,
+)
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
 from app.domains.retrieval.evidence_gate import EvidenceGate
 from app.domains.retrieval.expansion import expand_with_neighbors
@@ -116,6 +127,107 @@ async def _detect_and_resolve_conflicts(
     return resolved
 
 
+@dataclass
+class _Finalized:
+    """Answer after claim verification and conflict handling."""
+
+    answer: str
+    abstained: bool
+    reason: AbstentionReason | None
+    detail: str | None
+    verification_status: VerificationStatus
+    claims: list[ClaimVerification]
+    conflicts: list[ConflictInfo]
+
+
+async def _rewrite_supported_only(
+    question: str, answer: str, outcome: VerificationOutcome, llm: LLMProvider
+) -> str | None:
+    """Drop unsupported claims by rewriting from the supported ones. None if nothing
+    usable remains or the rewrite fails (callers then fall back to abstaining)."""
+    claims = "\n".join(f"- {c.claim}" for c in outcome.supported_claims)
+    if not claims:
+        return None
+    try:
+        response = await llm.generate(
+            messages=[
+                {
+                    "role": "user",
+                    "content": REWRITE_SUPPORTED_ONLY_PROMPT.format(
+                        question=question, claims=claims, answer=answer
+                    ),
+                }
+            ],
+            temperature=0.0,
+            max_tokens=1024,
+        )
+    except Exception as e:
+        logger.warning("answer_rewrite_failed", error=str(e))
+        return None
+    text = response.content.strip()
+    return None if not text or text.upper() == "NONE" else text
+
+
+async def _finalize_answer(
+    question: str, answer: str, chunks: list[RetrievedChunk], llm: LLMProvider
+) -> _Finalized:
+    """Claim verification + conflict handling.
+
+    verified -> keep. partial -> rewrite without the unsupported claims (abstain if the
+    rewrite is impossible). unsupported -> abstain. unverified (the verifier itself
+    failed) -> keep but flag, or abstain when REQUIRE_VERIFICATION is set.
+    """
+    outcome = await claim_verifier.verify(answer, chunks, llm)
+    conflicts = await _detect_and_resolve_conflicts(chunks, llm)
+
+    def abstain(reason: AbstentionReason, detail: str) -> _Finalized:
+        return _Finalized(
+            answer=ABSTENTION_TEMPLATE.format(reason=detail),
+            abstained=True,
+            reason=reason,
+            detail=detail,
+            verification_status=outcome.status,
+            claims=outcome.claims,
+            conflicts=conflicts,
+        )
+
+    if settings.ABSTAIN_ON_UNRESOLVED_CONFLICT and any(not c.resolved for c in conflicts):
+        return abstain(
+            AbstentionReason.conflicting_sources,
+            "The available sources disagree and the disagreement could not be resolved.",
+        )
+
+    final_answer, status = answer, outcome.status
+    if outcome.status == "unsupported":
+        return abstain(
+            AbstentionReason.verification_failed,
+            "The draft answer could not be supported by the retrieved sources.",
+        )
+    if outcome.status == "partial":
+        rewritten = await _rewrite_supported_only(question, answer, outcome, llm)
+        if rewritten is None:
+            return abstain(
+                AbstentionReason.verification_failed,
+                "Parts of the draft answer were not supported by the retrieved sources.",
+            )
+        final_answer = rewritten
+    elif outcome.status == "unverified" and settings.REQUIRE_VERIFICATION:
+        return abstain(
+            AbstentionReason.verification_failed,
+            "The answer could not be verified against the sources.",
+        )
+
+    return _Finalized(
+        answer=final_answer,
+        abstained=False,
+        reason=None,
+        detail=None,
+        verification_status=status,
+        claims=outcome.claims,
+        conflicts=conflicts,
+    )
+
+
 class RAGService:
     async def query(
         self,
@@ -162,6 +274,7 @@ class RAGService:
                 claim_verifications=[],
                 evidence_gate=gate_result,
                 abstained=True,
+                abstention_reason=AbstentionReason.insufficient_evidence,
                 retrieval_metadata=retrieval_metadata,
             )
 
@@ -198,32 +311,32 @@ class RAGService:
         with trace.span("citation_parsing"):
             citations = CitationParser.parse_citations(llm_response.content, selected_chunks)
 
-        # 8. Claim verification
+        # 8. Claim verification + conflict handling
         with trace.span("claim_verification", claims_checked=len(citations)):
-            claim_verifications = await claim_verifier.verify_claims(
-                llm_response.content, selected_chunks, llm
-            )
-
-        # 9. Conflict detection
-        with trace.span("conflict_detection"):
-            conflicts = await _detect_and_resolve_conflicts(selected_chunks, llm)
+            final = await _finalize_answer(request.query, llm_response.content, selected_chunks, llm)
+        if final.abstained:
+            citations = []
 
         trace_summary = trace.finish(
-            abstained=False,
+            abstained=final.abstained,
+            reason=final.detail,
+            verification_status=final.verification_status,
             citations_found=len(citations),
-            conflicts_detected=len(conflicts),
+            conflicts_detected=len(final.conflicts),
             estimated_cost_usd=retrieval_metadata["estimated_cost_usd"],
         )
         retrieval_metadata["trace_id"] = trace_summary["trace_id"]
         retrieval_metadata["span_ms"] = trace.to_spans_dict()
 
         return RAGResponse(
-            answer=llm_response.content,
+            answer=final.answer,
             citations=citations,
-            claim_verifications=claim_verifications,
-            conflicts=conflicts,
+            claim_verifications=final.claims,
+            conflicts=final.conflicts,
             evidence_gate=gate_result,
-            abstained=False,
+            abstained=final.abstained,
+            abstention_reason=final.reason,
+            verification_status=final.verification_status,
             retrieval_metadata=retrieval_metadata,
         )
 
@@ -256,6 +369,7 @@ class RAGService:
             yield {
                 "type": "done",
                 "abstained": True,
+                "abstention_reason": AbstentionReason.insufficient_evidence.value,
                 "citations": [],
                 "evidence_gate": gate_result.model_dump(),
             }
@@ -285,12 +399,9 @@ class RAGService:
             citations = CitationParser.parse_citations(full_answer, selected_chunks)
 
         with trace.span("claim_verification"):
-            claim_verifications = await claim_verifier.verify_claims(
-                full_answer, selected_chunks, llm
-            )
-
-        with trace.span("conflict_detection"):
-            conflicts = await _detect_and_resolve_conflicts(selected_chunks, llm)
+            final = await _finalize_answer(request.query, full_answer, selected_chunks, llm)
+        if final.abstained:
+            citations = []
 
         # Streaming responses don't carry token usage on the wire, so cost is
         # a tiktoken-based estimate rather than the exact figure query() gets.
@@ -304,18 +415,25 @@ class RAGService:
         )
 
         trace_summary = trace.finish(
-            abstained=False,
+            abstained=final.abstained,
+            reason=final.detail,
+            verification_status=final.verification_status,
             citations_found=len(citations),
-            conflicts_detected=len(conflicts),
+            conflicts_detected=len(final.conflicts),
             estimated_cost_usd=estimated_cost,
         )
 
         yield {
             "type": "done",
-            "abstained": False,
+            "abstained": final.abstained,
+            "abstention_reason": final.reason.value if final.reason else None,
+            "verification_status": final.verification_status,
+            # Tokens were already streamed; when verification changed the answer the client
+            # replaces what it showed with this.
+            "final_answer": final.answer if final.answer != full_answer else None,
             "citations": [c.model_dump(mode="json") for c in citations],
-            "claim_verifications": [c.model_dump() for c in claim_verifications],
-            "conflicts": [c.model_dump() for c in conflicts],
+            "claim_verifications": [c.model_dump() for c in final.claims],
+            "conflicts": [c.model_dump() for c in final.conflicts],
             "evidence_gate": gate_result.model_dump(),
             "cost_metadata": {
                 "estimated_prompt_tokens": estimated_prompt_tokens,

@@ -47,6 +47,12 @@ class Settings(BaseSettings):
 
     # Advanced retrieval
     ENABLE_ADAPTIVE_ROUTING: bool = True
+    # If the claim verifier itself fails, abstain instead of returning the answer flagged
+    # as 'unverified'.
+    REQUIRE_VERIFICATION: bool = False
+    # Abstain (instead of answering and exposing the conflict) when sources disagree
+    # and the resolver cannot pick a winner.
+    ABSTAIN_ON_UNRESOLVED_CONFLICT: bool = False
     ENABLE_NEIGHBOR_EXPANSION: bool = True
     ENABLE_SECTION_SUMMARIES: bool = False  # costs one LLM call per section at ingest
 

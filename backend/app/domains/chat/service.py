@@ -134,7 +134,15 @@ class ChatService:
                 role=MessageRole.assistant,
                 content=rag_response.answer,
                 citations=[c.model_dump(mode="json") for c in rag_response.citations],
-                retrieval_metadata=rag_response.retrieval_metadata,
+                retrieval_metadata={
+                    **rag_response.retrieval_metadata,
+                    "abstention_reason": (
+                        rag_response.abstention_reason.value
+                        if rag_response.abstention_reason
+                        else None
+                    ),
+                    "verification_status": rag_response.verification_status,
+                },
                 token_usage={
                     "prompt_tokens": rag_response.retrieval_metadata.get("prompt_tokens"),
                     "completion_tokens": rag_response.retrieval_metadata.get("completion_tokens"),
@@ -187,9 +195,13 @@ class ChatService:
             Message(
                 conversation_id=conv.id,
                 role=MessageRole.assistant,
-                content="".join(full_answer_parts),
+                # Verification may have replaced what was streamed (partial -> rewritten,
+                # unsupported -> abstention); history must keep the final text, not the draft.
+                content=final_event.get("final_answer") or "".join(full_answer_parts),
                 citations=final_event.get("citations"),
                 retrieval_metadata={
+                    "abstention_reason": final_event.get("abstention_reason"),
+                    "verification_status": final_event.get("verification_status"),
                     "evidence_gate": final_event.get("evidence_gate"),
                     "conflicts": final_event.get("conflicts"),
                     "agent": final_event.get("agent"),

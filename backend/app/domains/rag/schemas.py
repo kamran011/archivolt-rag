@@ -1,4 +1,6 @@
 import uuid
+from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -24,11 +26,33 @@ class Citation(BaseModel):
     relevance_score: float
 
 
+class AbstentionReason(str, Enum):
+    """Why the system declined to answer. Abstaining is a valid outcome."""
+
+    insufficient_evidence = "insufficient_evidence"
+    conflicting_sources = "conflicting_sources"
+    verification_failed = "verification_failed"
+    # Reserved: not produced today because retrieval is tenant-scoped up front
+    # (unauthorized), superseded docs are filtered out (outdated), and there is
+    # no question-type classifier yet (unsupported_question).
+    unauthorized = "unauthorized"
+    outdated = "outdated"
+    unsupported_question = "unsupported_question"
+
+
+ClaimStatus = Literal["supported", "partial", "unsupported"]
+
+# verified: every claim supported. partial: some unsupported claims were removed.
+# unsupported: nothing was supported. unverified: the verifier itself failed.
+VerificationStatus = Literal["verified", "partial", "unsupported", "unverified", "skipped"]
+
+
 class ClaimVerification(BaseModel):
     claim: str
     supported: bool
     supporting_sources: list[int]
     confidence: float
+    status: ClaimStatus = "supported"
 
 
 class ConflictInfo(BaseModel):
@@ -49,4 +73,6 @@ class RAGResponse(BaseModel):
     conflicts: list[ConflictInfo] = []
     evidence_gate: EvidenceGateResult
     abstained: bool
+    abstention_reason: AbstentionReason | None = None
+    verification_status: VerificationStatus = "skipped"
     retrieval_metadata: dict

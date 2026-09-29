@@ -4,11 +4,13 @@ import { useCallback, useState } from "react";
 import { streamChat } from "@/lib/streamChat";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type {
+  AbstentionReason,
   AgentSummary,
   Citation,
   ConflictInfo,
   EvidenceGateResult,
   MessageRole,
+  VerificationStatus,
 } from "@/lib/types";
 
 export interface ChatMessage {
@@ -17,6 +19,8 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   abstained?: boolean;
+  abstentionReason?: AbstentionReason | null;
+  verificationStatus?: VerificationStatus;
   evidenceGate?: EvidenceGateResult;
   conflicts?: ConflictInfo[];
   agent?: AgentSummary;
@@ -73,8 +77,11 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
                   ? {
                       ...m,
                       streaming: false,
+                      content: event.final_answer ?? m.content,
                       citations: event.citations,
                       abstained: event.abstained,
+                      abstentionReason: event.abstention_reason,
+                      verificationStatus: event.verification_status,
                       evidenceGate: event.evidence_gate,
                       conflicts: event.conflicts,
                       agent: event.agent,

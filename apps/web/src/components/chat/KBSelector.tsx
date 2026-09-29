@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
 interface KBSelectorProps {
@@ -26,9 +27,9 @@ export default function KBSelector({ selectedIds, onChange }: KBSelectorProps) {
     return (
       <div className="text-xs text-gray-400">
         No knowledge bases yet —{" "}
-        <a href="/dashboard/knowledge-bases/new" className="text-blue-600 hover:underline">
+        <Link href="/dashboard/knowledge-bases/new" className="text-blue-600 hover:underline">
           create one
-        </a>
+        </Link>
         .
       </div>
     );

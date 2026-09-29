@@ -118,6 +118,18 @@ export interface Message {
   created_at: string;
 }
 
+export type AbstentionReason =
+  | "insufficient_evidence"
+  | "conflicting_sources"
+  | "verification_failed"
+  | "unauthorized"
+  | "outdated"
+  | "unsupported_question";
+
+// verified: all claims supported. partial: unsupported claims were removed.
+// unverified: the verifier failed, so the answer was NOT checked.
+export type VerificationStatus = "verified" | "partial" | "unsupported" | "unverified" | "skipped";
+
 export interface EvidenceGateResult {
   pass_gate: boolean;
   reason: string | null;
@@ -131,6 +143,8 @@ export interface RAGResponse {
   citations: Citation[];
   evidence_gate: EvidenceGateResult;
   abstained: boolean;
+  abstention_reason?: AbstentionReason | null;
+  verification_status?: VerificationStatus;
   retrieval_metadata: Record<string, unknown>;
 }
 

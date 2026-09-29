@@ -1,5 +1,12 @@
 import { createClient } from "@/lib/supabase/client";
-import type { AgentSummary, Citation, ConflictInfo, EvidenceGateResult } from "@/lib/types";
+import type {
+  AbstentionReason,
+  AgentSummary,
+  Citation,
+  ConflictInfo,
+  EvidenceGateResult,
+  VerificationStatus,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -8,6 +15,10 @@ export interface ChatStreamEvent {
   content?: string;
   conversation_id?: string;
   abstained?: boolean;
+  abstention_reason?: AbstentionReason | null;
+  verification_status?: VerificationStatus;
+  // Set when verification changed the answer after it was streamed; replaces the shown text.
+  final_answer?: string | null;
   citations?: Citation[];
   claim_verifications?: unknown[];
   conflicts?: ConflictInfo[];
