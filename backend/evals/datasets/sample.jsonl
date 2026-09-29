@@ -1,0 +1,7 @@
+# Format: one JSON object per line. Replace these with questions about YOUR knowledge base.
+# Answerable cases need gold_documents (document titles) and/or gold_passages (verbatim snippets).
+# Unanswerable cases set should_abstain=true: the system must refuse rather than guess.
+{"id": "refund-window", "question": "How many days do customers have to request a refund?", "gold_documents": ["Refund Policy"], "gold_passages": ["30 days"], "expected_keywords": ["30 days"], "tags": ["factual"]}
+{"id": "clause-lookup", "question": "What does section 4.2 say about termination?", "gold_passages": ["4.2"], "expected_keywords": ["terminat"], "tags": ["exact-lookup"]}
+{"id": "overview", "question": "Summarize the onboarding guide", "gold_documents": ["Onboarding Guide"], "tags": ["broad"]}
+{"id": "out-of-scope", "question": "What is the CEO's favourite colour?", "should_abstain": true, "tags": ["unanswerable"]}

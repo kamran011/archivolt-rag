@@ -1,0 +1,26 @@
+from app.domains.ingestion.parsers.base import BaseParser
+from app.domains.ingestion.parsers.docx_parser import DocxParser
+from app.domains.ingestion.parsers.markdown_parser import MarkdownParser
+from app.domains.ingestion.parsers.pdf_parser import PDFParser
+from app.domains.ingestion.parsers.text_parser import TextParser
+from app.models.document import FileType
+
+_REGISTRY: dict[FileType, type[BaseParser]] = {
+    FileType.pdf: PDFParser,
+    FileType.docx: DocxParser,
+    FileType.md: MarkdownParser,
+    FileType.txt: TextParser,
+    FileType.html: TextParser,  # basic fallback until a dedicated HTML parser is added
+    FileType.csv: TextParser,
+    FileType.json: TextParser,
+}
+
+
+def get_parser(file_type: FileType) -> BaseParser:
+    parser_cls = _REGISTRY.get(file_type)
+    if not parser_cls:
+        raise ValueError(f"No parser registered for file type: {file_type}")
+    return parser_cls()
+
+
+__all__ = ["BaseParser", "PDFParser", "DocxParser", "MarkdownParser", "TextParser", "get_parser"]

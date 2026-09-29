@@ -1,0 +1,77 @@
+from contextlib import asynccontextmanager
+
+import structlog
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+
+from app.config import settings
+from app.core.database import engine
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import configure_logging
+from app.core.middleware import LoggingMiddleware, RequestIdMiddleware
+
+logger = structlog.get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    configure_logging()
+    # Verify DB connectivity on startup
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("database_connected")
+    except Exception as e:
+        logger.error("database_connection_failed", error=str(e))
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(
+    title="Archivolt API",
+    version="0.1.0",
+    description="AI Knowledge & Evidence Platform",
+    lifespan=lifespan,
+)
+
+# Middleware (order matters — outermost first)
+app.add_middleware(LoggingMiddleware)
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+register_exception_handlers(app)
+
+
+@app.get("/health", tags=["system"])
+async def health():
+    return {"status": "healthy", "version": "0.1.0", "environment": settings.ENVIRONMENT}
+
+
+from app.domains.auth.router import router as auth_router
+from app.domains.organizations.router import router as organizations_router
+from app.domains.knowledge_bases.router import router as kb_router
+from app.domains.documents.router import router as documents_router
+from app.domains.ingestion.router import router as ingestion_router
+from app.domains.retrieval.router import router as retrieval_router
+from app.domains.chat.router import router as chat_router
+from app.domains.analytics.router import router as analytics_router
+
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(organizations_router, prefix="/api/v1/organizations", tags=["organizations"])
+app.include_router(kb_router, prefix="/api/v1/knowledge-bases", tags=["knowledge-bases"])
+app.include_router(
+    documents_router,
+    prefix="/api/v1/knowledge-bases/{kb_id}/documents",
+    tags=["documents"],
+)
+app.include_router(ingestion_router, prefix="/api/v1/ingestion", tags=["ingestion"])
+app.include_router(retrieval_router, prefix="/api/v1/retrieval", tags=["retrieval"])
+app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])

@@ -1,0 +1,45 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from app.models.document import AuthorityTier, DocumentStatus, FileType
+
+
+class DocumentResponse(BaseModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    knowledge_base_id: uuid.UUID
+    title: str
+    file_name: str
+    file_type: FileType
+    file_size: int
+    status: DocumentStatus
+    page_count: int | None
+    chunk_count: int
+    error_message: str | None
+    version: int
+    is_current: bool
+    supersedes_document_id: uuid.UUID | None
+    superseded_at: datetime | None
+    effective_date: datetime | None
+    authority_tier: AuthorityTier
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DocumentDetailResponse(DocumentResponse):
+    parsing_metadata: dict | None
+    storage_path: str
+
+
+class DocumentUpdate(BaseModel):
+    authority_tier: AuthorityTier | None = None
+    effective_date: datetime | None = None
+
+
+class SignedUrlResponse(BaseModel):
+    url: str
+    expires_in: int

@@ -1,0 +1,68 @@
+import json
+
+import structlog
+
+from app.domains.rag.prompts import CLAIM_VERIFICATION_PROMPT
+from app.domains.rag.schemas import ClaimVerification
+from app.domains.retrieval.evidence import ContextAssembler
+from app.domains.retrieval.schemas import RetrievedChunk
+from app.providers.llm.base import LLMProvider
+
+logger = structlog.get_logger()
+
+
+class ClaimVerifier:
+    async def verify_claims(
+        self,
+        answer: str,
+        chunks: list[RetrievedChunk],
+        llm: LLMProvider,
+    ) -> list[ClaimVerification]:
+        if not chunks or not answer.strip():
+            return []
+
+        sources_text = ContextAssembler.format_with_citations(chunks)
+        prompt = CLAIM_VERIFICATION_PROMPT.format(answer=answer, sources=sources_text)
+
+        try:
+            response = await llm.generate(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=1024,
+            )
+        except Exception as e:
+            logger.warning("claim_verification_failed", error=str(e))
+            return []
+
+        return self._parse_verifications(response.content)
+
+    def _parse_verifications(self, raw: str) -> list[ClaimVerification]:
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                data = next(iter(data.values())) if data else []
+
+            verifications = []
+            for item in data:
+                verifications.append(
+                    ClaimVerification(
+                        claim=item["claim"],
+                        supported=bool(item["supported"]),
+                        supporting_sources=[int(s) for s in item.get("supporting_sources", [])],
+                        confidence=float(item.get("confidence", 0.5)),
+                    )
+                )
+            return verifications
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            logger.warning("claim_verification_parse_failed", error=str(e), raw=raw[:200])
+            return []
+
+
+claim_verifier = ClaimVerifier()
