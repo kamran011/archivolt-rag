@@ -122,3 +122,16 @@ async def test_cross_tenant_kb_id_returns_nothing(db, tenants):
     for engine in (VectorRetrievalEngine, KeywordRetrievalEngine, HybridRetrievalEngine):
         results = await engine().search(db, org_a.id, "refund", [kb_b.id], top_k=5)
         assert results == []
+
+
+async def test_readiness_endpoint_reports_database_up(monkeypatch):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    engine = create_async_engine(DB_URL)
+    monkeypatch.setattr("app.main.engine", engine)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health/ready")
+    await engine.dispose()
+    assert r.status_code == 200 and r.json()["database"] == "up"

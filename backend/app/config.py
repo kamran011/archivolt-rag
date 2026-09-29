@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # Auth
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
+    JWT_AUDIENCE: str = "authenticated"  # Supabase user access tokens
 
     # AI Providers
     OPENAI_API_KEY: str

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.config import settings
@@ -53,6 +54,19 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
+
+
+@app.get("/health/ready", tags=["system"])
+async def ready():
+    """Readiness: verifies the database is reachable (503 otherwise). /health stays a
+    cheap liveness probe."""
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error("readiness_check_failed", error=str(e))
+        return JSONResponse(status_code=503, content={"status": "unavailable", "database": "down"})
+    return {"status": "ready", "database": "up"}
 
 
 @app.get("/health", tags=["system"])

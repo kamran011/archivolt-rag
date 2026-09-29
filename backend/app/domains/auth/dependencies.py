@@ -18,6 +18,32 @@ logger = structlog.get_logger()
 security = HTTPBearer(auto_error=False)
 
 
+def decode_access_token(token: str) -> tuple[uuid.UUID, str]:
+    """Validate a Supabase access token (signature, expiry, audience) and return
+    (user_id, email). Single place tokens are verified."""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=[settings.JWT_ALGORITHM],
+            audience=settings.JWT_AUDIENCE,
+            # jose skips the audience check when the claim is absent unless required.
+            options={"require_aud": True},
+        )
+    except JWTError as e:
+        logger.warning("jwt_validation_failed", error=str(e))
+        raise UnauthorizedError("Invalid or expired token") from e
+
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise UnauthorizedError("Token missing subject claim")
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise UnauthorizedError("Invalid user ID in token") from None
+    return user_id, payload.get("email", "")
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     x_organization_id: str | None = Header(default=None, alias="X-Organization-Id"),
@@ -26,28 +52,7 @@ async def get_current_user(
     if not credentials:
         raise UnauthorizedError("Missing authorization token")
 
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET,
-            algorithms=[settings.JWT_ALGORITHM],
-            audience="authenticated",
-            options={"verify_aud": False},
-        )
-    except JWTError as e:
-        logger.warning("jwt_validation_failed", error=str(e))
-        raise UnauthorizedError("Invalid or expired token") from e
-
-    user_id_str = payload.get("sub")
-    email = payload.get("email", "")
-    if not user_id_str:
-        raise UnauthorizedError("Token missing subject claim")
-
-    try:
-        user_id = uuid.UUID(user_id_str)
-    except ValueError:
-        raise UnauthorizedError("Invalid user ID in token") from None
+    user_id, email = decode_access_token(credentials.credentials)
 
     if not x_organization_id:
         return CurrentUser(id=user_id, email=email)
