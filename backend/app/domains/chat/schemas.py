@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -14,6 +15,7 @@ class ChatRequest(BaseModel):
     stream: bool = True
     agentic: bool = False
     web_search: bool = False  # allow external web results (still needs org opt-in)
+    mode: Literal["rag", "cag", "hybrid"] = "rag"
 
 
 class ConversationCreate(BaseModel):

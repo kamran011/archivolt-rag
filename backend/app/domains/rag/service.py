@@ -29,13 +29,18 @@ from app.domains.rag.schemas import (
 from app.domains.rag.stages import build_stages
 from app.domains.retrieval.access import AccessScope, Actor
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
+from app.domains.retrieval.cag import CagContext, load_cag_context
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, is_external
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
 from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
 from app.domains.retrieval.query_router import RouteDecision, query_router
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
-from app.domains.retrieval.sufficiency import SufficiencyResult, evaluate_sufficiency
+from app.domains.retrieval.sufficiency import (
+    SufficiencyResult,
+    _covers,
+    evaluate_sufficiency,
+)
 from app.domains.tools.base import ToolContext, ToolExecutor
 from app.domains.tools.registry import default_registry
 from app.providers.cost import estimate_llm_cost
@@ -124,6 +129,8 @@ class _Evidence:
     sufficiency: SufficiencyResult
     strategies_tried: list[str]
     web_audit: list
+    mode_used: str = "rag"  # 'cag' when the answer context is the whole knowledge base
+    cag_note: str | None = None  # why CAG was requested but not used
 
     @property
     def passed(self) -> bool:
@@ -158,7 +165,103 @@ def _merge_candidates(
     return existing + [c for c in new if c.chunk_id not in seen]
 
 
+def _term_overlap(terms: list[str], text: str) -> float:
+    """Share of the question's key terms present in a chunk: a cheap, honest relevance signal
+    for CAG, where nothing is ranked or reranked."""
+    if not terms:
+        return 0.5
+    low = text.lower()
+    return sum(1 for t in terms if _covers(t, low)) / len(terms)
+
+
+def _cag_evidence(
+    request: RAGRequest, analysis: QueryAnalysis, cag: CagContext, web_audit: list
+) -> _Evidence:
+    chunks = [
+        c.model_copy(update={"score": round(_term_overlap(analysis.terms, c.content), 3)})
+        for c in cag.chunks
+    ]
+    # Best-first (stable: ties keep the loader's authority/title/position order), so the most
+    # relevant passage is Source 1, like in the ranked RAG path.
+    chunks.sort(key=lambda c: c.score, reverse=True)
+    top = max((c.score for c in chunks), default=0.0)
+    gate = EvidenceGateResult(
+        pass_gate=bool(chunks),
+        reason=None if chunks else "The knowledge base has no content",
+        confidence=top,
+        top_score=top,
+        chunk_count=len(chunks),
+    )
+    # No reranker vouches for relevance here, so only real term coverage counts
+    # (high_confidence above any possible score disables the "trust the reranker" override).
+    sufficiency = evaluate_sufficiency(analysis, chunks, high_confidence=2.0)
+    return _Evidence(
+        retrieval=_Retrieved(chunks=chunks, retrieval_time_ms=0.0, strategy="cag"),
+        candidates=chunks,
+        reranked=chunks,
+        after_score=chunks,
+        filtered=chunks,
+        filter_drops=[],
+        gate=gate,
+        analysis=analysis,
+        sufficiency=sufficiency,
+        strategies_tried=["cag"],
+        web_audit=web_audit,
+        mode_used="cag",
+    )
+
+
 async def _gather_evidence(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    trace: RetrievalTrace,
+    scope: AccessScope | None,
+    actor: Actor | None = None,
+) -> _Evidence:
+    """Answer-mode dispatcher. rag: the normal retrieval pipeline. cag: the whole (small,
+    opted-in) knowledge base as context, falling back to rag when ineligible. hybrid: rag
+    first, then cag if rag's evidence is insufficient."""
+    if request.mode == "rag":
+        return await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)
+
+    analysis = analyze_query(request.query)
+
+    async def try_cag() -> CagContext:
+        with trace.span("cag_load", mode=request.mode) as span:
+            cag = await load_cag_context(
+                db, org_id, request.knowledge_base_ids, scope, None
+            )
+            span.attributes.update(
+                eligible=cag.eligible, tokens=cag.total_tokens, reason=cag.reason
+            )
+        return cag
+
+    if request.mode == "cag":
+        cag = await try_cag()
+        if cag.eligible:
+            return _cag_evidence(request, analysis, cag, [])
+        ev = await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)
+        ev.cag_note = cag.reason
+        return ev
+
+    ev = await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)  # hybrid
+    if ev.passed:
+        return ev
+    cag = await try_cag()
+    if not cag.eligible:
+        ev.cag_note = cag.reason
+        return ev
+    cag_ev = _cag_evidence(request, analysis, cag, ev.web_audit)
+    if cag_ev.passed:
+        cag_ev.strategies_tried = [*ev.strategies_tried, "cag"]
+        return cag_ev
+    ev.cag_note = "CAG context did not cover the question either"
+    return ev
+
+
+async def _gather_rag_evidence(
     db: AsyncSession,
     org_id: uuid.UUID,
     request: RAGRequest,
@@ -452,7 +555,9 @@ class RAGService:
             "candidates_after_rerank": len(reranked),
             "candidates_after_filter": len(filtered),
             "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
             "strategies_tried": ev.strategies_tried,
+            **({"cag_note": ev.cag_note} if ev.cag_note else {}),
             "query_intent": ev.analysis.intent,
             "sufficiency": ev.sufficiency.model_dump(),
         }
@@ -481,6 +586,7 @@ class RAGService:
                     ),
                     "meta": {
                         "strategy": retrieval_result.strategy,
+                        "answer_mode": ev.mode_used,
                         "tool_audit": _tool_audit(ev),
                     },
                 },
@@ -489,11 +595,13 @@ class RAGService:
         # 5. Assemble context
         filtered_before_expansion = filtered
         with trace.span("context_assembly"):
-            if settings.ENABLE_NEIGHBOR_EXPANSION:
+            if ev.mode_used != "cag" and settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
-            if settings.ENABLE_PARENT_EXPANSION:
+            if ev.mode_used != "cag" and settings.ENABLE_PARENT_EXPANSION:
                 filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
-            selected_chunks, context_tokens = ContextAssembler.assemble(filtered)
+            selected_chunks, context_tokens = ContextAssembler.assemble(
+                filtered, max_tokens=settings.CAG_MAX_TOKENS if ev.mode_used == "cag" else None
+            )
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
         retrieval_metadata["context_tokens"] = context_tokens
         retrieval_metadata["chunks_in_context"] = len(selected_chunks)
@@ -551,6 +659,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
             "tool_audit": _tool_audit(ev),
         }
 
@@ -607,6 +716,7 @@ class RAGService:
                     ),
                     "meta": {
                         "strategy": retrieval_result.strategy,
+                        "answer_mode": ev.mode_used,
                         "tool_audit": _tool_audit(ev),
                     },
                 },
@@ -615,11 +725,13 @@ class RAGService:
 
         filtered_before_expansion = filtered
         with trace.span("context_assembly"):
-            if settings.ENABLE_NEIGHBOR_EXPANSION:
+            if ev.mode_used != "cag" and settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
-            if settings.ENABLE_PARENT_EXPANSION:
+            if ev.mode_used != "cag" and settings.ENABLE_PARENT_EXPANSION:
                 filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
-            selected_chunks, _ = ContextAssembler.assemble(filtered)
+            selected_chunks, _ = ContextAssembler.assemble(
+                filtered, max_tokens=settings.CAG_MAX_TOKENS if ev.mode_used == "cag" else None
+            )
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
 
         llm = get_llm_provider(request.model)
@@ -677,6 +789,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
             "tool_audit": _tool_audit(ev),
         }
 

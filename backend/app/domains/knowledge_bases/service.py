@@ -27,6 +27,7 @@ class KnowledgeBaseService:
             chunk_size=data.chunk_size,
             chunk_overlap=data.chunk_overlap,
             embedding_model=data.embedding_model,
+            cag_enabled=data.cag_enabled,
         )
         db.add(kb)
         await db.flush()
@@ -76,6 +77,8 @@ class KnowledgeBaseService:
             kb.description = data.description
         if data.status is not None:
             kb.status = data.status
+        if data.cag_enabled is not None:
+            kb.cag_enabled = data.cag_enabled
         await db.flush()
         return kb
 

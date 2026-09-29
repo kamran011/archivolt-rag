@@ -15,6 +15,9 @@ class RAGRequest(BaseModel):
     temperature: float = 0.1
     agentic: bool = False
     web_search: bool = False  # the user asked to allow external web results
+    # rag: retrieve passages. cag: answer from the whole (small) KB. hybrid: RAG first, then
+    # CAG if RAG's evidence is insufficient. CAG needs the KB to opt in and fit the budget.
+    mode: Literal["rag", "cag", "hybrid"] = "rag"
 
 
 class Citation(BaseModel):

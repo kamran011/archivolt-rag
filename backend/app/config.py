@@ -54,6 +54,9 @@ class Settings(BaseSettings):
 
     # Advanced retrieval
     ENABLE_ADAPTIVE_ROUTING: bool = True
+    # CAG (full-context answering) token budget. A KB whose current, visible content exceeds
+    # this is not CAG-eligible and falls back to RAG (never silently truncated).
+    CAG_MAX_TOKENS: int = 12000
     # Sufficiency gate: does the evidence cover what the question needs?
     ENABLE_SUFFICIENCY_GATE: bool = True
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence

@@ -13,12 +13,14 @@ class KBCreate(BaseModel):
     chunk_size: int = Field(default=512, ge=128, le=2048)
     chunk_overlap: int = Field(default=64, ge=0, le=256)
     embedding_model: str = "text-embedding-3-small"
+    cag_enabled: bool = False
 
 
 class KBUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     status: KBStatus | None = None
+    cag_enabled: bool | None = None
 
 
 class KBResponse(BaseModel):
@@ -32,10 +34,19 @@ class KBResponse(BaseModel):
     chunk_overlap: int
     status: KBStatus
     document_count: int
+    cag_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CagInfo(BaseModel):
+    enabled: bool
+    eligible: bool
+    reason: str | None
+    tokens: int
+    limit: int
 
 
 class KBStats(BaseModel):

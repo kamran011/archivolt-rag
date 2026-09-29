@@ -2,7 +2,7 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -44,6 +44,9 @@ class KnowledgeBase(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     chunk_overlap: Mapped[int] = mapped_column(Integer, nullable=False, default=64)
     status: Mapped[KBStatus] = mapped_column(nullable=False, default=KBStatus.active)
     document_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Allows CAG (full-context answering) for this KB. Only meaningful for small, stable KBs;
+    # requests still fall back to RAG when the KB does not fit the CAG token budget.
+    cag_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     organization: Mapped["Organization"] = relationship(
         "Organization", back_populates="knowledge_bases"
