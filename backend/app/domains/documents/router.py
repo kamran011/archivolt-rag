@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -8,8 +8,11 @@ from app.core.rate_limit import rate_limit
 from app.domains.auth.dependencies import require_org, require_role
 from app.domains.auth.schemas import CurrentUser
 from app.domains.documents.schemas import (
+    ChunkPage,
+    ChunkView,
     DocumentDetailResponse,
     DocumentResponse,
+    DocumentTree,
     DocumentUpdate,
     SignedUrlResponse,
 )
@@ -55,6 +58,35 @@ async def list_documents(
 ):
     docs = await document_service.list(db, current_user.organization_id, kb_id)
     return [DocumentResponse.model_validate(d) for d in docs]
+
+
+@router.get("/{doc_id}/chunks", response_model=ChunkPage)
+async def list_document_chunks(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: CurrentUser = Depends(require_org),
+    db: AsyncSession = Depends(get_db),
+):
+    """The chunks a document was split into (what retrieval actually indexes)."""
+    total, items = await document_service.list_chunks(
+        db, current_user.organization_id, doc_id, limit, offset
+    )
+    return ChunkPage(total=total, items=[ChunkView(**i) for i in items])
+
+
+@router.get("/{doc_id}/tree", response_model=DocumentTree)
+async def get_document_tree(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_org),
+    db: AsyncSession = Depends(get_db),
+):
+    """The heading outline built at ingestion (used for tree navigation)."""
+    doc = await document_service.get(db, current_user.organization_id, doc_id)
+    nodes = (doc.parsing_metadata or {}).get("tree") or []
+    return DocumentTree(document_id=doc.id, nodes=nodes)
 
 
 @router.get("/{doc_id}", response_model=DocumentDetailResponse)

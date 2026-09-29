@@ -1,9 +1,10 @@
+import builtins
 import uuid
 from datetime import UTC, datetime
 
 import structlog
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -12,6 +13,7 @@ from app.domains.documents.schemas import DocumentUpdate
 from app.domains.documents.storage import storage_service
 from app.domains.documents.upload_safety import read_limited, sanitize_filename, sniff_content
 from app.domains.knowledge_bases.service import kb_service
+from app.models.chunk import Chunk
 from app.models.document import AuthorityTier, Document, DocumentStatus, FileType
 
 logger = structlog.get_logger()
@@ -257,6 +259,46 @@ class DocumentService:
         await db.delete(doc)  # cascades to chunks
         await kb_service.increment_document_count(db, doc.knowledge_base_id, delta=-1)
         await db.flush()
+
+    async def list_chunks(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        limit: int,
+        offset: int,
+    ) -> tuple[int, builtins.list[dict]]:  # `list` is shadowed by the method above
+        """Chunks of a document (org-scoped), without loading the embedding vectors."""
+        await self.get(db, org_id, doc_id)
+        base = (Chunk.document_id == doc_id, Chunk.organization_id == org_id)
+        total = (
+            await db.execute(select(func.count()).select_from(Chunk).where(*base))
+        ).scalar_one()
+        rows = await db.execute(
+            select(
+                Chunk.id,
+                Chunk.chunk_index,
+                Chunk.token_count,
+                Chunk.content,
+                Chunk.metadata_,
+                Chunk.embedding.is_not(None).label("has_embedding"),
+            )
+            .where(*base)
+            .order_by(Chunk.chunk_index)
+            .limit(limit)
+            .offset(offset)
+        )
+        return total, [
+            {
+                "id": r.id,
+                "chunk_index": r.chunk_index,
+                "token_count": r.token_count,
+                "content": r.content,
+                "metadata": r.metadata_,
+                "has_embedding": r.has_embedding,
+            }
+            for r in rows
+        ]
 
     async def get_signed_url(
         self,

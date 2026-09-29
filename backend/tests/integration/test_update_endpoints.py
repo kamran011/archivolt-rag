@@ -76,3 +76,34 @@ async def test_org_admin_cannot_manage_other_org_on_postgres(env):  # noqa: F811
             headers=h_a,
         )
         assert r.status_code == 404, r.text
+
+
+async def test_document_inspection_endpoints_and_isolation(env):  # noqa: F811
+    _, orgs = env
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        h, kb = await onboard(c, orgs, uuid.uuid4(), f"insp-{uuid.uuid4().hex[:6]}")
+        doc = await upload(
+            c, h, kb, "p.pdf",
+            make_pdf({"Refund Policy": "Annual plans are refundable within 30 days."}),
+        )
+        base = f"/api/v1/knowledge-bases/{kb}/documents/{doc}"
+
+        r = await c.get(f"{base}/chunks", headers=h)
+        assert r.status_code == 200, r.text
+        page = r.json()
+        assert page["total"] >= 1 and page["items"][0]["has_embedding"] is True
+        assert "embedding" not in page["items"][0]  # vectors are never sent
+        assert "refund" in page["items"][0]["content"].lower()
+
+        r = await c.get(f"{base}/chunks", params={"limit": 1, "offset": 999}, headers=h)
+        assert r.json()["items"] == [] and r.json()["total"] == page["total"]
+
+        r = await c.get(f"{base}/tree", headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["document_id"] == doc and isinstance(r.json()["nodes"], list)
+
+        # Another org cannot inspect this document's chunks or tree.
+        h2, kb2 = await onboard(c, orgs, uuid.uuid4(), f"insp2-{uuid.uuid4().hex[:6]}")
+        other = f"/api/v1/knowledge-bases/{kb2}/documents/{doc}"
+        assert (await c.get(f"{other}/chunks", headers=h2)).status_code == 404
+        assert (await c.get(f"{other}/tree", headers=h2)).status_code == 404

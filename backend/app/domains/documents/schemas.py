@@ -43,3 +43,24 @@ class DocumentUpdate(BaseModel):
 class SignedUrlResponse(BaseModel):
     url: str
     expires_in: int
+
+
+class ChunkView(BaseModel):
+    id: uuid.UUID
+    chunk_index: int
+    token_count: int
+    content: str
+    metadata: dict
+    has_embedding: bool
+
+
+class ChunkPage(BaseModel):
+    total: int
+    items: list[ChunkView]
+
+
+class DocumentTree(BaseModel):
+    document_id: uuid.UUID
+    # Heading outline built at ingestion (nodes map to chunk indices); empty if the
+    # document has no headings or predates tree building.
+    nodes: list[dict]
