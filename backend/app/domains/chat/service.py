@@ -1,3 +1,4 @@
+import dataclasses
 import uuid
 from collections.abc import AsyncIterator
 
@@ -11,9 +12,10 @@ from app.domains.chat.schemas import ChatRequest, ConversationCreate
 from app.domains.observability.store import save_rag_trace
 from app.domains.rag.schemas import RAGRequest, RAGResponse
 from app.domains.rag.service import rag_service
-from app.domains.retrieval.access import AccessScope
+from app.domains.retrieval.access import AccessScope, Actor
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
+from app.models.organization import Organization
 
 logger = structlog.get_logger()
 
@@ -112,6 +114,16 @@ class ChatService:
         await db.flush()
         return conv
 
+    async def _with_org_settings(
+        self, db: AsyncSession, org_id: uuid.UUID, actor: Actor | None
+    ) -> Actor | None:
+        """Attach the organization's settings (e.g. whether web search is enabled) to the
+        actor. Read from the database, never from the request."""
+        if actor is None:
+            return None
+        org = await db.get(Organization, org_id)
+        return dataclasses.replace(actor, org_settings=dict(org.settings or {}) if org else {})
+
     async def _build_history(self, db: AsyncSession, conv: Conversation) -> list[dict]:
         recent = (await self._load_messages(db, conv.id))[-MAX_HISTORY_MESSAGES:]
         return [
@@ -127,9 +139,11 @@ class ChatService:
         user_id: uuid.UUID,
         request: ChatRequest,
         scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> RAGResponse:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
         history = await self._build_history(db, conv)
+        actor = await self._with_org_settings(db, org_id, actor)
 
         db.add(
             Message(conversation_id=conv.id, role=MessageRole.user, content=request.message)
@@ -147,6 +161,7 @@ class ChatService:
                 agentic=request.agentic,
             ),
             scope,
+            actor,
         )
 
         db.add(
@@ -203,9 +218,11 @@ class ChatService:
         user_id: uuid.UUID,
         request: ChatRequest,
         scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
         history = await self._build_history(db, conv)
+        actor = await self._with_org_settings(db, org_id, actor)
 
         db.add(
             Message(conversation_id=conv.id, role=MessageRole.user, content=request.message)
@@ -227,6 +244,7 @@ class ChatService:
                 agentic=request.agentic,
             ),
             scope,
+            actor,
         ):
             if event["type"] == "token":
                 full_answer_parts.append(event["content"])

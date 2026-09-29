@@ -27,7 +27,7 @@ from app.domains.rag.schemas import (
     VerificationStatus,
 )
 from app.domains.rag.stages import build_stages
-from app.domains.retrieval.access import AccessScope
+from app.domains.retrieval.access import AccessScope, Actor
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
@@ -73,10 +73,18 @@ async def _retrieve_candidates(
     request: RAGRequest,
     route: RouteDecision,
     scope: AccessScope | None,
+    actor: Actor | None = None,
 ) -> _Retrieved:
     if request.agentic and settings.ENABLE_AGENTIC_RAG:
         agent = await retrieval_agent.run(
-            db, org_id, request.query, request.knowledge_base_ids, scope=scope
+            db,
+            org_id,
+            request.query,
+            request.knowledge_base_ids,
+            scope=scope,
+            user_id=actor.user_id if actor else None,
+            role=actor.role if actor else None,
+            org_settings=actor.org_settings if actor else None,
         )
         return _Retrieved(
             chunks=agent.chunks[:AGENTIC_MAX_CANDIDATES],
@@ -153,6 +161,7 @@ async def _gather_evidence(
     route: RouteDecision,
     trace: RetrievalTrace,
     scope: AccessScope | None,
+    actor: Actor | None = None,
 ) -> _Evidence:
     """Retrieve, rerank, filter and check the evidence; when the sufficiency gate says it
     is not enough, widen retrieval with another strategy (bounded) before giving up.
@@ -167,7 +176,7 @@ async def _gather_evidence(
         pass
 
     with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-        retrieval = await _retrieve_candidates(db, org_id, request, route, scope)
+        retrieval = await _retrieve_candidates(db, org_id, request, route, scope, actor)
     candidates = list(retrieval.chunks)
     tried = [retrieval.strategy]
 
@@ -216,6 +225,11 @@ async def _gather_evidence(
         sufficiency=sufficiency,
         strategies_tried=tried,
     )
+
+
+def _tool_audit(retrieval: _Retrieved) -> list[dict]:
+    """Agent tool-call audit records, carried in the internal trace channel to persistence."""
+    return [a.model_dump(mode="json") for a in retrieval.agent.tool_audit] if retrieval.agent else []
 
 
 def _route_query(query: str) -> RouteDecision:
@@ -366,12 +380,13 @@ class RAGService:
         org_id: uuid.UUID,
         request: RAGRequest,
         scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> RAGResponse:
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
         # 1-4. Retrieve, rerank, filter, evidence + sufficiency gates (with bounded expansion)
-        ev = await _gather_evidence(db, org_id, request, route, trace, scope)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope, actor)
         retrieval_result, candidates = ev.retrieval, ev.candidates
         reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
         gate_result = ev.gate
@@ -409,7 +424,10 @@ class RAGService:
                         selected=[],
                         cited_chunk_ids=[],
                     ),
-                    "meta": {"strategy": retrieval_result.strategy},
+                    "meta": {
+                        "strategy": retrieval_result.strategy,
+                        "tool_audit": _tool_audit(retrieval_result),
+                    },
                 },
             )
 
@@ -478,6 +496,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
+            "tool_audit": _tool_audit(retrieval_result),
         }
 
         return RAGResponse(
@@ -499,12 +518,13 @@ class RAGService:
         org_id: uuid.UUID,
         request: RAGRequest,
         scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
         """Same pipeline through context assembly, then streams tokens via SSE-shaped events."""
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        ev = await _gather_evidence(db, org_id, request, route, trace, scope)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope, actor)
         retrieval_result = ev.retrieval
         reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
         gate_result = ev.gate
@@ -530,7 +550,10 @@ class RAGService:
                         selected=[],
                         cited_chunk_ids=[],
                     ),
-                    "meta": {"strategy": retrieval_result.strategy},
+                    "meta": {
+                        "strategy": retrieval_result.strategy,
+                        "tool_audit": _tool_audit(retrieval_result),
+                    },
                 },
             }
             return
@@ -599,6 +622,7 @@ class RAGService:
             "spans": trace_summary["spans"],
             "total_ms": trace_summary["total_ms"],
             "strategy": retrieval_result.strategy,
+            "tool_audit": _tool_audit(retrieval_result),
         }
 
         yield {

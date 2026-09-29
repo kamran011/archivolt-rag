@@ -13,6 +13,7 @@ from app.domains.auth.dependencies import require_role
 from app.domains.auth.schemas import CurrentUser
 from app.models.organization_member import OrgRole
 from app.models.rag_trace import RagTrace
+from app.models.tool_audit import ToolAuditRecord
 
 router = APIRouter()
 
@@ -50,6 +51,37 @@ async def list_traces(
     if abstained is not None:
         stmt = stmt.where(RagTrace.abstained == abstained)
     stmt = stmt.order_by(RagTrace.created_at.desc()).limit(limit).offset(offset)
+    return (await db.execute(stmt)).scalars().all()
+
+
+class ToolCallView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seq: int
+    tool: str
+    arguments: dict
+    status: str
+    duration_ms: Decimal
+    result_chunks: int
+    detail: str | None
+    created_at: datetime
+
+
+@router.get("/traces/{trace_id}/tool-calls", response_model=list[ToolCallView])
+async def get_trace_tool_calls(
+    trace_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Every tool call the agent attempted for this trace (including denied/failed ones)."""
+    stmt = (
+        select(ToolAuditRecord)
+        .where(
+            ToolAuditRecord.trace_id == trace_id,
+            ToolAuditRecord.organization_id == current_user.organization_id,
+        )
+        .order_by(ToolAuditRecord.run_id, ToolAuditRecord.seq)
+    )
     return (await db.execute(stmt)).scalars().all()
 
 

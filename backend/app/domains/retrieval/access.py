@@ -11,7 +11,7 @@ Fail closed: when no AccessScope is supplied, restricted documents are excluded.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import ColumnElement, or_, select, true
 
@@ -22,6 +22,20 @@ from app.models.document import Document, DocumentAccess
 class AccessScope:
     user_id: uuid.UUID | None
     is_admin: bool = False
+
+
+@dataclass(frozen=True)
+class Actor:
+    """Who is making an agentic request, for tool authorization. Derived from the
+    authenticated user and the organization row — never from request input."""
+
+    user_id: uuid.UUID | None
+    role: object | None = None  # OrgRole
+    org_settings: dict = field(default_factory=dict)
+
+
+def actor_for(user, org_settings: dict | None = None) -> Actor:
+    return Actor(user_id=user.id, role=user.role, org_settings=dict(org_settings or {}))
 
 
 # For internal, non-user-facing callers (never build one from request data).

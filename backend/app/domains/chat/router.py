@@ -17,7 +17,7 @@ from app.domains.chat.schemas import (
     MessageResponse,
 )
 from app.domains.chat.service import chat_service
-from app.domains.retrieval.access import AccessScope, scope_for
+from app.domains.retrieval.access import AccessScope, Actor, actor_for, scope_for
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -38,24 +38,37 @@ async def send_message(
     if request.stream:
         return StreamingResponse(
             _stream_response(
-                current_user.organization_id, current_user.id, request, scope_for(current_user)
+                current_user.organization_id,
+                current_user.id,
+                request,
+                scope_for(current_user),
+                actor_for(current_user),
             ),
             media_type="text/event-stream",
         )
 
     return await chat_service.send_message(
-        db, current_user.organization_id, current_user.id, request, scope_for(current_user)
+        db,
+        current_user.organization_id,
+        current_user.id,
+        request,
+        scope_for(current_user),
+        actor_for(current_user),
     )
 
 
 async def _stream_response(
-    org_id: uuid.UUID, user_id: uuid.UUID, request: ChatRequest, scope: AccessScope
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    request: ChatRequest,
+    scope: AccessScope,
+    actor: Actor,
 ):
     """Runs on its own DB session so the connection outlives the route handler's return."""
     async with AsyncSessionLocal() as db:
         try:
             async for event in chat_service.send_message_stream(
-                db, org_id, user_id, request, scope
+                db, org_id, user_id, request, scope, actor
             ):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:

@@ -50,7 +50,7 @@ def retriever(results_by_query: dict[str, list[RetrievedChunk]] | None = None):
 async def run_agent(llm, retr, question="q", org_id=None, kb_ids=None):
     with (
         patch("app.domains.agent.retrieval_agent.get_llm_provider", return_value=llm),
-        patch("app.domains.agent.retrieval_agent.retrieval_service", retr),
+        patch("app.domains.tools.search_tools.retrieval_service", retr),
     ):
         return await RetrievalAgent().run(
             MagicMock(), org_id or uuid.uuid4(), question, kb_ids or [uuid.uuid4()]
@@ -234,7 +234,9 @@ async def test_agent_error_never_raises():
     retr = MagicMock()
     retr.retrieve = AsyncMock(side_effect=RuntimeError("db down"))
     result = await run_agent(planner(), retr)
-    assert result.stop_reason == "error" and result.chunks == []
+    # A failing tool is contained by the executor (and audited) instead of aborting the run.
+    assert result.chunks == []
+    assert [(a.tool, a.status) for a in result.tool_audit] == [("knowledge_base_search", "error")]
 
 
 @pytest.mark.asyncio

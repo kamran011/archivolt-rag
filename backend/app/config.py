@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     AGENT_MAX_STEPS: int = 4
     AGENT_MAX_TOKENS: int = 8000  # total planner tokens (prompt + completion) per run
     AGENT_TIMEOUT_S: float = 30.0
+    TOOL_TIMEOUT_S: float = 10.0  # default per-call timeout for agent tools
 
     # Multimodal ingestion (vision-model OCR + figure descriptions; costs per image)
     ENABLE_VISION_INGESTION: bool = False  # also gates image-file ingestion (OCR)

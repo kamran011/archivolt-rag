@@ -4,6 +4,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.rag_trace import RagTrace, UsageLedger
+from app.models.tool_audit import ToolAuditRecord
 
 logger = structlog.get_logger()
 
@@ -52,6 +53,22 @@ async def save_rag_trace(
                 )
             )
             await db.flush()  # trace row must exist before the ledger FK references it
+            for call in meta.get("tool_audit") or []:
+                db.add(
+                    ToolAuditRecord(
+                        organization_id=org_id,
+                        user_id=user_id,
+                        run_id=uuid.UUID(str(call["run_id"])),
+                        trace_id=uuid.UUID(trace_id),
+                        seq=call.get("seq") or 0,
+                        tool=call["tool"],
+                        arguments=call.get("arguments") or {},
+                        status=call["status"],
+                        duration_ms=call.get("duration_ms") or 0,
+                        result_chunks=call.get("result_chunks") or 0,
+                        detail=call.get("detail"),
+                    )
+                )
             if cost_usd or prompt_tokens or completion_tokens:
                 db.add(
                     UsageLedger(

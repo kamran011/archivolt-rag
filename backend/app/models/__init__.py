@@ -8,6 +8,7 @@ from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
 from app.models.rag_trace import RagTrace, UsageLedger
 from app.models.summary import DocumentSummary
+from app.models.tool_audit import ToolAuditRecord
 
 __all__ = [
     "Base",
@@ -19,6 +20,7 @@ __all__ = [
     "Document",
     "DocumentAccess",
     "DocumentSummary",
+    "ToolAuditRecord",
     "DocumentStatus",
     "FileType",
     "Chunk",
