@@ -26,6 +26,7 @@ from app.domains.rag.schemas import (
     RAGResponse,
     VerificationStatus,
 )
+from app.domains.rag.stages import build_stages
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
 from app.domains.retrieval.evidence_gate import EvidenceGate
 from app.domains.retrieval.expansion import expand_with_neighbors
@@ -249,8 +250,8 @@ class RAGService:
 
         # 3. Filter
         with trace.span("filter", candidates_in=len(reranked)):
-            filtered = EvidenceFilter.filter_by_score(reranked)
-            filtered = EvidenceFilter.deduplicate(filtered)
+            after_score = EvidenceFilter.filter_by_score(reranked)
+            filtered = EvidenceFilter.deduplicate(after_score)
 
         # 4. Evidence gate
         with trace.span("evidence_gate", candidates=len(filtered)):
@@ -267,7 +268,7 @@ class RAGService:
             retrieval_metadata["agent"] = retrieval_result.agent.summary()
 
         if not gate_result.pass_gate:
-            trace.finish(abstained=True, reason=gate_result.reason)
+            trace_id = trace.finish(abstained=True, reason=gate_result.reason)["trace_id"]
             return RAGResponse(
                 answer=ABSTENTION_TEMPLATE.format(reason=gate_result.reason),
                 citations=[],
@@ -275,10 +276,22 @@ class RAGService:
                 evidence_gate=gate_result,
                 abstained=True,
                 abstention_reason=AbstentionReason.insufficient_evidence,
-                retrieval_metadata=retrieval_metadata,
+                retrieval_metadata={**retrieval_metadata, "trace_id": trace_id},
+                trace_stages={
+                    **build_stages(
+                        candidates=candidates,
+                        reranked=reranked,
+                        after_score=after_score,
+                        filtered=filtered,
+                        selected=[],
+                        cited_chunk_ids=[],
+                    ),
+                    "meta": {"strategy": retrieval_result.strategy},
+                },
             )
 
         # 5. Assemble context
+        filtered_before_expansion = filtered
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered)
@@ -327,6 +340,19 @@ class RAGService:
         )
         retrieval_metadata["trace_id"] = trace_summary["trace_id"]
         retrieval_metadata["span_ms"] = trace.to_spans_dict()
+        trace_stages = build_stages(
+            candidates=candidates,
+            reranked=reranked,
+            after_score=after_score,
+            filtered=filtered_before_expansion,
+            selected=selected_chunks,
+            cited_chunk_ids=[c.chunk_id for c in citations],
+        )
+        trace_stages["meta"] = {
+            "spans": trace_summary["spans"],
+            "total_ms": trace_summary["total_ms"],
+            "strategy": retrieval_result.strategy,
+        }
 
         return RAGResponse(
             answer=final.answer,
@@ -338,6 +364,7 @@ class RAGService:
             abstention_reason=final.reason,
             verification_status=final.verification_status,
             retrieval_metadata=retrieval_metadata,
+            trace_stages=trace_stages,
         )
 
     async def query_stream(
@@ -357,13 +384,14 @@ class RAGService:
             reranked = await _reranker.rerank(request.query, retrieval_result.chunks, top_k=10)
 
         with trace.span("filter", candidates_in=len(reranked)):
-            filtered = EvidenceFilter.deduplicate(EvidenceFilter.filter_by_score(reranked))
+            after_score = EvidenceFilter.filter_by_score(reranked)
+            filtered = EvidenceFilter.deduplicate(after_score)
 
         with trace.span("evidence_gate", candidates=len(filtered)):
             gate_result = EvidenceGate.evaluate(request.query, filtered)
 
         if not gate_result.pass_gate:
-            trace.finish(abstained=True, reason=gate_result.reason)
+            trace_id = trace.finish(abstained=True, reason=gate_result.reason)["trace_id"]
             abstention_text = ABSTENTION_TEMPLATE.format(reason=gate_result.reason)
             yield {"type": "token", "content": abstention_text}
             yield {
@@ -372,9 +400,22 @@ class RAGService:
                 "abstention_reason": AbstentionReason.insufficient_evidence.value,
                 "citations": [],
                 "evidence_gate": gate_result.model_dump(),
+                "trace_id": trace_id,
+                "trace_stages": {
+                    **build_stages(
+                        candidates=retrieval_result.chunks,
+                        reranked=reranked,
+                        after_score=after_score,
+                        filtered=filtered,
+                        selected=[],
+                        cited_chunk_ids=[],
+                    ),
+                    "meta": {"strategy": retrieval_result.strategy},
+                },
             }
             return
 
+        filtered_before_expansion = filtered
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered)
@@ -423,8 +464,23 @@ class RAGService:
             estimated_cost_usd=estimated_cost,
         )
 
+        trace_stages = build_stages(
+            candidates=retrieval_result.chunks,
+            reranked=reranked,
+            after_score=after_score,
+            filtered=filtered_before_expansion,
+            selected=selected_chunks,
+            cited_chunk_ids=[c.chunk_id for c in citations],
+        )
+        trace_stages["meta"] = {
+            "spans": trace_summary["spans"],
+            "total_ms": trace_summary["total_ms"],
+            "strategy": retrieval_result.strategy,
+        }
+
         yield {
             "type": "done",
+            "trace_stages": trace_stages,
             "abstained": final.abstained,
             "abstention_reason": final.reason.value if final.reason else None,
             "verification_status": final.verification_status,

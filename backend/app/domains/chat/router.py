@@ -77,8 +77,12 @@ async def get_conversation(
     current_user: CurrentUser = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ):
-    conv = await chat_service.get_conversation(db, current_user.organization_id, conv_id)
-    messages = await chat_service.get_messages(db, current_user.organization_id, conv_id)
+    conv = await chat_service.get_conversation(
+        db, current_user.organization_id, conv_id, current_user.id
+    )
+    messages = await chat_service.get_messages(
+        db, current_user.organization_id, conv_id, current_user.id
+    )
     return ConversationDetailResponse(
         id=conv.id,
         knowledge_base_id=conv.knowledge_base_id,
@@ -95,4 +99,6 @@ async def delete_conversation(
     current_user: CurrentUser = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ):
-    await chat_service.delete_conversation(db, current_user.organization_id, conv_id)
+    await chat_service.delete_conversation(
+        db, current_user.organization_id, conv_id, current_user.id
+    )

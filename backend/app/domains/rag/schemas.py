@@ -2,7 +2,7 @@ import uuid
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domains.retrieval.evidence_gate import EvidenceGateResult
 
@@ -76,3 +76,5 @@ class RAGResponse(BaseModel):
     abstention_reason: AbstentionReason | None = None
     verification_status: VerificationStatus = "skipped"
     retrieval_metadata: dict
+    # Internal: persisted to rag_traces by the chat layer, never sent to clients.
+    trace_stages: dict = Field(default_factory=dict, exclude=True)

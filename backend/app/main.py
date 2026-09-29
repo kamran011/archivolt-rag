@@ -80,6 +80,7 @@ from app.domains.chat.router import router as chat_router
 from app.domains.documents.router import router as documents_router
 from app.domains.ingestion.router import router as ingestion_router
 from app.domains.knowledge_bases.router import router as kb_router
+from app.domains.observability.router import router as observability_router
 from app.domains.organizations.router import router as organizations_router
 from app.domains.retrieval.router import router as retrieval_router
 
@@ -94,4 +95,7 @@ app.include_router(
 app.include_router(ingestion_router, prefix="/api/v1/ingestion", tags=["ingestion"])
 app.include_router(retrieval_router, prefix="/api/v1/retrieval", tags=["retrieval"])
 app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(
+    observability_router, prefix="/api/v1/observability", tags=["observability"]
+)
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])

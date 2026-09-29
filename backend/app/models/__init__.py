@@ -6,6 +6,7 @@ from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
 from app.models.message import Message, MessageRole
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
+from app.models.rag_trace import RagTrace, UsageLedger
 
 __all__ = [
     "Base",
@@ -21,4 +22,6 @@ __all__ = [
     "Conversation",
     "Message",
     "MessageRole",
+    "RagTrace",
+    "UsageLedger",
 ]

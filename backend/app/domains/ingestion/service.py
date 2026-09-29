@@ -95,6 +95,13 @@ class IngestionService:
                 # app/security/prompt_injection.py for the actual defense).
                 injection_flags = scan_for_injection_patterns(chunk_data.content)
                 metadata = dict(chunk_data.metadata)
+                # Record how this chunk was made: the KB's config can change later, so
+                # each chunk keeps the strategy/size/overlap it was produced with.
+                metadata["chunking"] = {
+                    "strategy": kb.chunk_strategy.value,
+                    "chunk_size": kb.chunk_size,
+                    "chunk_overlap": kb.chunk_overlap,
+                }
                 if injection_flags:
                     metadata["injection_risk_flags"] = injection_flags
                     flagged_chunk_count += 1
