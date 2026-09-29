@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.domains.auth.dependencies import get_current_user, require_role
+from app.domains.auth.dependencies import get_current_user, require_role_in_path_org
 from app.domains.auth.schemas import CurrentUser
 from app.domains.organizations.schemas import (
     OrgCreate,
@@ -56,7 +56,7 @@ async def update_org(
     org_id: uuid.UUID,
     data: OrgUpdate,
     current_user: CurrentUser = Depends(
-        require_role(OrgRole.admin, OrgRole.owner)
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -82,7 +82,7 @@ async def add_member(
     org_id: uuid.UUID,
     data: OrgMemberCreate,
     current_user: CurrentUser = Depends(
-        require_role(OrgRole.admin, OrgRole.owner)
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -95,7 +95,7 @@ async def update_member_role(
     org_id: uuid.UUID,
     member_id: uuid.UUID,
     data: OrgMemberUpdate,
-    current_user: CurrentUser = Depends(require_role(OrgRole.owner)),
+    current_user: CurrentUser = Depends(require_role_in_path_org(OrgRole.owner)),
     db: AsyncSession = Depends(get_db),
 ):
     member = await org_service.update_member_role(db, org_id, member_id, data)
@@ -107,7 +107,7 @@ async def remove_member(
     org_id: uuid.UUID,
     member_id: uuid.UUID,
     current_user: CurrentUser = Depends(
-        require_role(OrgRole.admin, OrgRole.owner)
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
     db: AsyncSession = Depends(get_db),
 ):

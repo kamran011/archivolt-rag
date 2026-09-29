@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.database import get_db
-from app.core.exceptions import ForbiddenError, UnauthorizedError
+from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.domains.auth.schemas import CurrentUser
 from app.models.organization_member import OrganizationMember, OrgRole
 
@@ -89,6 +89,23 @@ def require_role(*roles: OrgRole):
             raise ForbiddenError(
                 f"Requires role: {', '.join(r.value for r in roles)}"
             )
+        return current_user
+
+    return check
+
+
+def require_role_in_path_org(*roles: OrgRole):
+    """Like require_role, for routes that also carry an org id in the URL. The caller's role
+    comes from their membership in the X-Organization-Id org; without this check an admin of
+    org A could act on org B by naming B in the path. A mismatch is reported as 404 so
+    other orgs' ids can't be probed."""
+
+    async def check(
+        org_id: uuid.UUID,
+        current_user: CurrentUser = Depends(require_role(*roles)),
+    ) -> CurrentUser:
+        if current_user.organization_id != org_id:
+            raise NotFoundError("Organization not found")
         return current_user
 
     return check
