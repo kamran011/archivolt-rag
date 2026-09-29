@@ -7,6 +7,7 @@ from app.models.message import Message, MessageRole
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
 from app.models.rag_trace import RagTrace, UsageLedger
+from app.models.summary import DocumentSummary
 
 __all__ = [
     "Base",
@@ -17,6 +18,7 @@ __all__ = [
     "KnowledgeBase",
     "Document",
     "DocumentAccess",
+    "DocumentSummary",
     "DocumentStatus",
     "FileType",
     "Chunk",

@@ -10,10 +10,12 @@ from app.domains.documents.storage import storage_service
 from app.domains.ingestion.chunkers import get_chunker
 from app.domains.ingestion.parsers import get_parser
 from app.domains.ingestion.summarizer import summarize_tree
+from app.domains.ingestion.summary_index import build_summary_rows
 from app.domains.retrieval.tree import build_tree, tree_to_json
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
 from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
+from app.models.summary import DocumentSummary
 from app.providers.cost import estimate_embedding_cost, estimate_llm_cost
 from app.providers.embeddings.registry import get_embedding_provider
 from app.providers.llm.registry import get_llm_provider
@@ -139,8 +141,17 @@ class IngestionService:
             # Document tree (heading outline -> chunk indices) for tree navigation.
             # Stored in parsing_metadata; no dedicated table.
             tree_nodes = build_tree(chunk_data_list)
+            summary_rows: list = []
+            summary_stats: dict = {}
             if settings.ENABLE_SECTION_SUMMARIES:
                 await summarize_tree(tree_nodes, chunk_data_list)
+                summary_rows, summary_stats = await build_summary_rows(
+                    document,
+                    tree_nodes,
+                    llm=get_llm_provider(settings.RERANKER_MODEL),
+                    embedder=embedding_provider,
+                )
+                db.add_all(summary_rows)
 
             document.chunk_count = len(chunk_rows)
             document.status = DocumentStatus.ready
@@ -150,6 +161,14 @@ class IngestionService:
                 "tree": tree_to_json(tree_nodes),
                 **({"injection_flagged_chunks": flagged_chunk_count} if flagged_chunk_count else {}),
                 "embedding_tokens": embedding_token_total,
+                **(
+                    {
+                        "summaries_indexed": len(summary_rows),
+                        "summary_embedding_tokens": summary_stats.get("embedded_tokens", 0),
+                    }
+                    if summary_rows
+                    else {}
+                ),
                 **(
                     {
                         "chunking_llm_calls": chunker.calls,
@@ -188,6 +207,7 @@ class IngestionService:
     async def reprocess_document(self, db: AsyncSession, doc_id: uuid.UUID) -> None:
         # Remove existing chunks before re-running the pipeline
         await db.execute(delete(Chunk).where(Chunk.document_id == doc_id))
+        await db.execute(delete(DocumentSummary).where(DocumentSummary.document_id == doc_id))
         document = await db.get(Document, doc_id)
         if document:
             document.status = DocumentStatus.pending

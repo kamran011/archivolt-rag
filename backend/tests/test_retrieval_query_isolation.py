@@ -123,3 +123,45 @@ async def test_vector_engine_never_matches_a_different_orgs_id_string():
 
     _, params = compiled_sql_and_params(captured["stmt"])
     assert other_org_id not in params.values()
+
+
+@pytest.mark.asyncio
+async def test_summary_engine_queries_always_filter_by_org_kb_and_access():
+    """Every SELECT the summary engine issues is org-scoped, KB-scoped and access-scoped
+    (a dropped filter would leak candidate ids even though later stages also filter)."""
+    from unittest.mock import patch
+
+    from app.domains.retrieval.engines.summary_engine import SummaryRetrievalEngine
+
+    org_id, kb_id = uuid.uuid4(), uuid.uuid4()
+    statements = []
+
+    class FakeDB:
+        async def execute(self, stmt):
+            statements.append(stmt)
+
+            class Result:
+                def all(self):
+                    return []
+
+            return Result()
+
+    class FakeEmbeddingProvider:
+        async def embed_query(self, query):
+            return [0.0] * 1536
+
+    with patch(
+        "app.domains.retrieval.engines.summary_engine.get_embedding_provider",
+        return_value=FakeEmbeddingProvider(),
+    ):
+        await SummaryRetrievalEngine().search(FakeDB(), org_id, "q", [kb_id], top_k=5)
+
+    assert statements, "the engine should have queried document summaries"
+    sql, params = compiled_sql_and_params(statements[0])
+    assert "document_summaries.organization_id" in sql
+    assert "document_summaries.knowledge_base_id" in sql
+    assert org_id in params.values() and kb_id in params.values() or any(
+        isinstance(v, list) and kb_id in v for v in params.values()
+    )
+    # access control: restricted documents are excluded unless the scope allows them
+    assert "documents.restricted" in sql

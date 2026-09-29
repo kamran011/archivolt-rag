@@ -1,6 +1,7 @@
 import uuid
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import cast, select, tuple_
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.retrieval.access import AccessScope
@@ -63,4 +64,59 @@ async def expand_with_neighbors(
         score = seed_score[(chunk.document_id, chunk.chunk_index)] * NEIGHBOR_SCORE_FACTOR
         expanded.append(row_to_retrieved_chunk(chunk, doc, score, "neighbor"))
         known.add(chunk.id)
+    return expanded
+
+
+PARENT_SCORE_FACTOR = 0.7
+MAX_PARENT_CHUNKS_PER_SEED = 6
+
+
+async def expand_with_parents(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    chunks: list[RetrievedChunk],
+    *,
+    top_n: int = EXPAND_TOP_N,
+    max_per_seed: int = MAX_PARENT_CHUNKS_PER_SEED,
+    scope: AccessScope | None = None,
+) -> list[RetrievedChunk]:
+    """Parent/child retrieval: for the top hits, also bring in the rest of their *section*
+    (chunks of the same document under the enclosing heading, including sibling sections), so
+    a precise chunk is answered with its wider context. Added chunks are real source chunks,
+    scored below the hit that pulled them in, bounded per seed, org-scoped, and pass through
+    the same freshness/access filters as any retrieval."""
+    seeds = [c for c in chunks[:top_n] if c.metadata.get("heading_hierarchy")]
+    if not seeds:
+        return chunks
+
+    known = {c.chunk_id for c in chunks}
+    expanded = list(chunks)
+    for seed in seeds:
+        full_path = seed.metadata["heading_hierarchy"]
+        # Parent = the enclosing section (path minus the last heading); a top-level section
+        # is its own parent. Containment below also includes the seed's own section.
+        hierarchy = full_path[:-1] if len(full_path) > 1 else full_path
+        stmt = (
+            select(Chunk, Document)
+            .join(Document, Document.id == Chunk.document_id)
+            .where(
+                Chunk.organization_id == org_id,
+                Chunk.document_id == seed.document_id,
+                # JSONB containment: the parent heading path or anything beneath it.
+                cast(Chunk.metadata_, JSONB).contains({"heading_hierarchy": hierarchy}),
+            )
+            .order_by(Chunk.chunk_index)
+        )
+        stmt = apply_common_filters(stmt, None, scope)
+        added = 0
+        for chunk, doc in (await db.execute(stmt)).all():
+            if chunk.id in known:
+                continue
+            if added >= max_per_seed:
+                break
+            expanded.append(
+                row_to_retrieved_chunk(chunk, doc, seed.score * PARENT_SCORE_FACTOR, "parent")
+            )
+            known.add(chunk.id)
+            added += 1
     return expanded

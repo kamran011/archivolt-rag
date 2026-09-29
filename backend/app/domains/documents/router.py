@@ -13,9 +13,11 @@ from app.domains.documents.schemas import (
     ChunkView,
     DocumentDetailResponse,
     DocumentResponse,
+    DocumentSummaries,
     DocumentTree,
     DocumentUpdate,
     SignedUrlResponse,
+    SummaryView,
 )
 from app.domains.documents.service import document_service
 from app.domains.ingestion.background import run_ingestion
@@ -101,6 +103,26 @@ async def get_document_tree(
     )
     nodes = (doc.parsing_metadata or {}).get("tree") or []
     return DocumentTree(document_id=doc.id, nodes=nodes)
+
+
+@router.get("/{doc_id}/summaries", response_model=DocumentSummaries)
+async def get_document_summaries(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    current_user: CurrentUser = Depends(require_org),
+    db: AsyncSession = Depends(get_db),
+):
+    """Navigation summaries (document + sections). Model-written; not evidence."""
+    rows = await document_service.list_summaries(
+        db, current_user.organization_id, doc_id, scope=scope_for(current_user)
+    )
+    return DocumentSummaries(
+        document_id=doc_id,
+        items=[
+            SummaryView(level=r.level, node_id=r.node_id, title=r.title, summary=r.summary)
+            for r in rows
+        ],
+    )
 
 
 @router.get("/{doc_id}", response_model=DocumentDetailResponse)

@@ -31,7 +31,7 @@ from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
-from app.domains.retrieval.expansion import expand_with_neighbors
+from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
 from app.domains.retrieval.query_router import RouteDecision, query_router
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
@@ -131,10 +131,10 @@ class _Evidence:
 def _expansion_ladder(first: str, request: RAGRequest) -> list[RouteDecision]:
     """Strategies to try, in order, when the first attempt is insufficient. Never repeats a
     strategy already tried, and never runs everything: capped by MAX_RETRIEVAL_EXPANSIONS."""
-    order: list[RouteDecision] = [
-        RouteDecision(strategy="hybrid", reason="expand: hybrid"),
-        RouteDecision(strategy="tree", reason="expand: document tree"),
-    ]
+    order: list[RouteDecision] = [RouteDecision(strategy="hybrid", reason="expand: hybrid")]
+    if settings.ENABLE_SECTION_SUMMARIES:  # summaries only exist when they are generated
+        order.append(RouteDecision(strategy="summary", reason="expand: hierarchical summaries"))
+    order.append(RouteDecision(strategy="tree", reason="expand: document tree"))
     ladder = [r for r in order if r.strategy != first]
     return ladder[: max(0, settings.MAX_RETRIEVAL_EXPANSIONS)]
 
@@ -418,6 +418,8 @@ class RAGService:
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
+            if settings.ENABLE_PARENT_EXPANSION:
+                filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
             selected_chunks, context_tokens = ContextAssembler.assemble(filtered)
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
         retrieval_metadata["context_tokens"] = context_tokens
@@ -537,6 +539,8 @@ class RAGService:
         with trace.span("context_assembly"):
             if settings.ENABLE_NEIGHBOR_EXPANSION:
                 filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
+            if settings.ENABLE_PARENT_EXPANSION:
+                filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
             selected_chunks, _ = ContextAssembler.assemble(filtered)
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
 

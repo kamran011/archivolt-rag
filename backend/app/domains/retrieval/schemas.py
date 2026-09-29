@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-RetrievalStrategy = Literal["semantic", "keyword", "hybrid", "tree"]
+RetrievalStrategy = Literal["semantic", "keyword", "hybrid", "tree", "summary"]
 
 
 class RetrievalFilters(BaseModel):

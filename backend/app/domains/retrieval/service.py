@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.hybrid_engine import HybridRetrievalEngine
 from app.domains.retrieval.engines.keyword_engine import KeywordRetrievalEngine
+from app.domains.retrieval.engines.summary_engine import SummaryRetrievalEngine
 from app.domains.retrieval.engines.tree_engine import TreeRetrievalEngine
 from app.domains.retrieval.engines.vector_engine import VectorRetrievalEngine
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievalResult
@@ -15,6 +16,7 @@ _ENGINES = {
     "keyword": KeywordRetrievalEngine(),
     "hybrid": HybridRetrievalEngine(),
     "tree": TreeRetrievalEngine(),
+    "summary": SummaryRetrievalEngine(),
 }
 
 
@@ -40,8 +42,8 @@ class RetrievalService:
             embedding_model,
             scope,
         )
-        if strategy == "tree" and not chunks:
-            # Nothing to navigate (no trees / navigation failed): degrade to hybrid.
+        if strategy in ("tree", "summary") and not chunks:
+            # Nothing to navigate (no trees/summaries, or navigation failed): degrade to hybrid.
             strategy = "hybrid"
             chunks = await _ENGINES[strategy].search(
                 db,

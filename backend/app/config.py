@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # and the resolver cannot pick a winner.
     ABSTAIN_ON_UNRESOLVED_CONFLICT: bool = False
     ENABLE_NEIGHBOR_EXPANSION: bool = True
+    # Also pull in the rest of a hit's section (parent context). Off by default: it can add
+    # a lot of text; the context budget still bounds what reaches the LLM.
+    ENABLE_PARENT_EXPANSION: bool = False
     ENABLE_SECTION_SUMMARIES: bool = False  # costs one LLM call per section at ingest
 
     # Agentic retrieval (opt-in per request; hard bounds on every run)

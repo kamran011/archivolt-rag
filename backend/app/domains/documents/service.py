@@ -23,6 +23,7 @@ from app.models.document import (
     FileType,
 )
 from app.models.organization_member import OrganizationMember
+from app.models.summary import DocumentSummary
 
 logger = structlog.get_logger()
 
@@ -354,6 +355,17 @@ class DocumentService:
             }
             for r in rows
         ]
+
+    async def list_summaries(
+        self, db: AsyncSession, org_id: uuid.UUID, doc_id: uuid.UUID, *, scope: AccessScope
+    ) -> builtins.list[DocumentSummary]:
+        await self.get(db, org_id, doc_id, scope=scope)
+        rows = await db.execute(
+            select(DocumentSummary)
+            .where(DocumentSummary.document_id == doc_id, DocumentSummary.organization_id == org_id)
+            .order_by(DocumentSummary.level.desc(), DocumentSummary.node_id)
+        )
+        return list(rows.scalars().all())
 
     async def get_signed_url(
         self,

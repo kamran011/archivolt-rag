@@ -68,3 +68,15 @@ class DocumentTree(BaseModel):
     # Heading outline built at ingestion (nodes map to chunk indices); empty if the
     # document has no headings or predates tree building.
     nodes: list[dict]
+
+
+class SummaryView(BaseModel):
+    level: str
+    node_id: str | None
+    title: str
+    summary: str
+
+
+class DocumentSummaries(BaseModel):
+    document_id: uuid.UUID
+    items: list[SummaryView]

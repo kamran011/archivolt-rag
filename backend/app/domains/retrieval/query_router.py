@@ -13,7 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-RouteStrategy = Literal["semantic", "keyword", "hybrid", "tree"]
+RouteStrategy = Literal["semantic", "keyword", "hybrid", "tree", "summary"]
 
 _BROAD_RE = re.compile(
     r"\b(summari[sz]e|summary|overview|outline|what is (this|the) (document|policy|report|"

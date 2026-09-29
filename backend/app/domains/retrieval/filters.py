@@ -3,7 +3,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.domains.retrieval.access import AccessScope, visible_document_clause
 from app.domains.retrieval.schemas import RetrievalFilters
-from app.models.chunk import Chunk
 from app.models.document import AuthorityTier, Document
 
 _AUTHORITY_RANK = {
@@ -33,7 +32,7 @@ def apply_common_filters(
         return stmt
 
     if filters.document_ids:
-        stmt = stmt.where(Chunk.document_id.in_(filters.document_ids))
+        stmt = stmt.where(Document.id.in_(filters.document_ids))
     if filters.file_types:
         stmt = stmt.where(Document.file_type.in_(filters.file_types))
     if filters.date_from:
