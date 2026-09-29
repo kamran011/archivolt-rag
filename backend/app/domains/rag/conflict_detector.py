@@ -1,11 +1,11 @@
 import json
 
 import structlog
+from pydantic import BaseModel
 
 from app.domains.retrieval.evidence import ContextAssembler
 from app.domains.retrieval.schemas import RetrievedChunk
 from app.providers.llm.base import LLMProvider
-from pydantic import BaseModel
 
 logger = structlog.get_logger()
 

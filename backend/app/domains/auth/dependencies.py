@@ -11,7 +11,7 @@ from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.domains.auth.schemas import CurrentUser
-from app.models.organization_member import OrgRole, OrganizationMember
+from app.models.organization_member import OrganizationMember, OrgRole
 
 logger = structlog.get_logger()
 
@@ -37,7 +37,7 @@ async def get_current_user(
         )
     except JWTError as e:
         logger.warning("jwt_validation_failed", error=str(e))
-        raise UnauthorizedError("Invalid or expired token")
+        raise UnauthorizedError("Invalid or expired token") from e
 
     user_id_str = payload.get("sub")
     email = payload.get("email", "")
@@ -47,7 +47,7 @@ async def get_current_user(
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
-        raise UnauthorizedError("Invalid user ID in token")
+        raise UnauthorizedError("Invalid user ID in token") from None
 
     if not x_organization_id:
         return CurrentUser(id=user_id, email=email)
@@ -55,7 +55,7 @@ async def get_current_user(
     try:
         org_id = uuid.UUID(x_organization_id)
     except ValueError:
-        raise UnauthorizedError("Invalid organization ID header")
+        raise UnauthorizedError("Invalid organization ID header") from None
 
     # Look up membership — this is the ONLY way org_id is resolved
     stmt = select(OrganizationMember).where(

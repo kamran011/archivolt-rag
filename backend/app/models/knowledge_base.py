@@ -8,8 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.organization import Organization
     from app.models.document import Document
+    from app.models.organization import Organization
 
 
 class ChunkStrategy(str, Enum):

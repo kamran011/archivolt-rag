@@ -1,4 +1,3 @@
-import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String, Text
@@ -7,8 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, portable_jsonb
 
 if TYPE_CHECKING:
-    from app.models.organization_member import OrganizationMember
     from app.models.knowledge_base import KnowledgeBase
+    from app.models.organization_member import OrganizationMember
 
 
 class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):

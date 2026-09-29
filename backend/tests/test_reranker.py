@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -123,14 +124,14 @@ async def test_reranker_empty_input_returns_empty():
 async def test_reranker_preserves_authority_and_version_fields():
     """Regression: reranking must not drop document-level fields, or conflict
     resolution (authority/freshness/version) silently sees defaults."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     reranker = LLMReranker(model="gpt-4o-mini")
     reranker._client = MagicMock()
     reranker._client.chat.completions.create = AsyncMock(
         return_value=mock_openai_response('[{"index": 0, "relevance_score": 8}]')
     )
-    when = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    when = datetime(2025, 1, 1, tzinfo=UTC)
     chunk = make_chunk("policy text").model_copy(
         update={
             "authority_tier": "authoritative",

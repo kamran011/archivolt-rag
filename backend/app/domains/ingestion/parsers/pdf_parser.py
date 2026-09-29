@@ -23,7 +23,7 @@ class PDFParser(BaseParser):
         try:
             doc = fitz.open(stream=content, filetype="pdf")
         except Exception as e:
-            raise IngestionError(f"Failed to open PDF: {e}")
+            raise IngestionError(f"Failed to open PDF: {e}") from e
 
         try:
             body_size = self._estimate_body_font_size(doc)

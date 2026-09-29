@@ -15,7 +15,6 @@ from app.domains.chat.schemas import (
     MessageResponse,
 )
 from app.domains.chat.service import chat_service
-from app.domains.rag.schemas import RAGResponse
 
 router = APIRouter()
 

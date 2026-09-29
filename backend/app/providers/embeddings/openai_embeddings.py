@@ -1,7 +1,7 @@
 import asyncio
 
 import structlog
-from openai import AsyncOpenAI, APIError, RateLimitError
+from openai import APIError, AsyncOpenAI, RateLimitError
 
 from app.config import settings
 from app.core.exceptions import ProviderError

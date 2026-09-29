@@ -1,7 +1,6 @@
-import time
 import uuid
-from dataclasses import dataclass
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 import structlog
 import tiktoken

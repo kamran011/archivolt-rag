@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.domains.organizations.schemas import OrgCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
 from app.models.organization import Organization
-from app.models.organization_member import OrgRole, OrganizationMember
+from app.models.organization_member import OrganizationMember, OrgRole
 
 logger = structlog.get_logger()
 

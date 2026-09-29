@@ -26,7 +26,7 @@ class OpenAIProvider(LLMProvider):
                 max_tokens=max_tokens,
             )
         except Exception as e:
-            raise ProviderError(f"OpenAI generation failed: {e}")
+            raise ProviderError(f"OpenAI generation failed: {e}") from e
 
         choice = response.choices[0]
         return LLMResponse(
@@ -55,4 +55,4 @@ class OpenAIProvider(LLMProvider):
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
-            raise ProviderError(f"OpenAI streaming failed: {e}")
+            raise ProviderError(f"OpenAI streaming failed: {e}") from e

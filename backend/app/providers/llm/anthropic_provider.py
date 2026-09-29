@@ -39,7 +39,7 @@ class AnthropicProvider(LLMProvider):
                 max_tokens=max_tokens,
             )
         except Exception as e:
-            raise ProviderError(f"Anthropic generation failed: {e}")
+            raise ProviderError(f"Anthropic generation failed: {e}") from e
 
         text = "".join(block.text for block in response.content if block.type == "text")
         return LLMResponse(
@@ -68,4 +68,4 @@ class AnthropicProvider(LLMProvider):
                 async for text in stream.text_stream:
                     yield text
         except Exception as e:
-            raise ProviderError(f"Anthropic streaming failed: {e}")
+            raise ProviderError(f"Anthropic streaming failed: {e}") from e

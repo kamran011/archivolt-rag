@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.domains.auth.dependencies import get_current_user, require_org, require_role
+from app.domains.auth.dependencies import require_org, require_role
 from app.domains.auth.schemas import CurrentUser
 from app.domains.knowledge_bases.schemas import KBCreate, KBResponse, KBStats, KBUpdate
 from app.domains.knowledge_bases.service import kb_service

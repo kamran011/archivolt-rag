@@ -31,7 +31,7 @@ async def verify_token(
             options={"verify_aud": False},
         )
     except JWTError as e:
-        raise UnauthorizedError(f"Invalid token: {e}")
+        raise UnauthorizedError(f"Invalid token: {e}") from e
 
     user_id_str = payload.get("sub")
     email = payload.get("email", "")

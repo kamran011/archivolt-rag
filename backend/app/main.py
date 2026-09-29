@@ -54,14 +54,14 @@ async def health():
     return {"status": "healthy", "version": "0.1.0", "environment": settings.ENVIRONMENT}
 
 
+from app.domains.analytics.router import router as analytics_router
 from app.domains.auth.router import router as auth_router
-from app.domains.organizations.router import router as organizations_router
-from app.domains.knowledge_bases.router import router as kb_router
+from app.domains.chat.router import router as chat_router
 from app.domains.documents.router import router as documents_router
 from app.domains.ingestion.router import router as ingestion_router
+from app.domains.knowledge_bases.router import router as kb_router
+from app.domains.organizations.router import router as organizations_router
 from app.domains.retrieval.router import router as retrieval_router
-from app.domains.chat.router import router as chat_router
-from app.domains.analytics.router import router as analytics_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(organizations_router, prefix="/api/v1/organizations", tags=["organizations"])

@@ -9,8 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, portable_jsonb
 
 if TYPE_CHECKING:
-    from app.models.knowledge_base import KnowledgeBase
     from app.models.chunk import Chunk
+    from app.models.knowledge_base import KnowledgeBase
 
 
 class FileType(str, Enum):

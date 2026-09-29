@@ -12,7 +12,7 @@ class DocxParser(BaseParser):
         try:
             doc = DocxDocument(io.BytesIO(content))
         except Exception as e:
-            raise IngestionError(f"Failed to open DOCX: {e}")
+            raise IngestionError(f"Failed to open DOCX: {e}") from e
 
         elements: list[DocumentElement] = []
 
