@@ -13,6 +13,7 @@ from app.domains.retrieval import debug as debug_module
 from app.domains.retrieval.debug import DebugRequest, RetrievalDebugger
 from app.domains.retrieval.schemas import RetrievedChunk
 from app.models.organization_member import OrgRole
+from app.providers.reranker.llm_reranker import LLMReranker
 
 
 def row(day, abstained=False, cost=0.01, meta=None, citations=None) -> UsageRow:
@@ -119,7 +120,7 @@ async def test_debugger_reports_drops_with_reasons_and_budget():
         return sorted(rescored, key=lambda c: c.score, reverse=True)[:top_k]
 
     with (
-        patch.object(debug_module.LLMReranker, "rerank", new=fake_rerank),
+        patch.object(LLMReranker, "rerank", new=fake_rerank),
         patch.object(debug_module.settings, "ENABLE_NEIGHBOR_EXPANSION", False),
     ):
         resp = await dbg.run(
@@ -158,7 +159,7 @@ async def test_debugger_gate_failure_skips_context_and_uses_router():
     with (
         patch.object(debug_module.retrieval_service, "retrieve",
                      new=AsyncMock(return_value=MagicMock(chunks=[weak], strategy="keyword"))),
-        patch.object(debug_module.LLMReranker, "rerank", new=fake_rerank),
+        patch.object(LLMReranker, "rerank", new=fake_rerank),
     ):
         resp = await dbg.run(
             AsyncMock(), uuid.uuid4(),

@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     RERANK_TOP_K: int = 10
     MIN_RELEVANCE_SCORE: float = 0.25
     SCORE_FILTER_THRESHOLD: float = 0.3
+    MAX_CHUNKS_PER_DOCUMENT: int = 4  # 0 disables the per-document diversity cap
     MAX_CONTEXT_TOKENS: int = 4096
 
     # LLM
     DEFAULT_LLM_MODEL: str = "gpt-4o"
     RERANKER_MODEL: str = "gpt-4o-mini"
+    RERANKER_PROVIDER: str = "llm"  # llm | cohere | none
+    COHERE_API_KEY: str = ""
+    COHERE_RERANK_MODEL: str = "rerank-v3.5"
     LLM_TEMPERATURE: float = 0.1
     LLM_MAX_TOKENS: int = 2048
 

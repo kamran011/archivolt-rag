@@ -39,11 +39,11 @@ from app.domains.retrieval.sufficiency import SufficiencyResult, evaluate_suffic
 from app.providers.cost import estimate_llm_cost
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.registry import get_llm_provider
-from app.providers.reranker.llm_reranker import LLMReranker
+from app.providers.reranker.registry import get_reranker
 
 logger = structlog.get_logger()
 
-_reranker = LLMReranker()
+_reranker = get_reranker()
 
 AGENTIC_MAX_CANDIDATES = 30
 
@@ -107,6 +107,7 @@ class _Evidence:
     reranked: list[RetrievedChunk]
     after_score: list[RetrievedChunk]
     filtered: list[RetrievedChunk]
+    filter_drops: list
     gate: EvidenceGateResult
     analysis: QueryAnalysis
     sufficiency: SufficiencyResult
@@ -176,8 +177,10 @@ async def _gather_evidence(
         with trace.span("rerank", candidates_in=len(candidates)):
             reranked = await _reranker.rerank(request.query, candidates, top_k=10)
         with trace.span("filter", candidates_in=len(reranked)):
-            after_score = EvidenceFilter.filter_by_score(reranked)
-            filtered = EvidenceFilter.deduplicate(after_score)
+            after_score, outcome = EvidenceFilter.run_pipeline(
+                reranked, keep_superseded=analysis.wants_historical
+            )
+            filtered = outcome.kept
         with trace.span("evidence_gate", candidates=len(filtered)):
             gate = EvidenceGate.evaluate(request.query, filtered)
         with trace.span("sufficiency_gate", attempt=attempt) as span:
@@ -207,6 +210,7 @@ async def _gather_evidence(
         reranked=reranked,
         after_score=after_score,
         filtered=filtered,
+        filter_drops=outcome.dropped,
         gate=gate,
         analysis=analysis,
         sufficiency=sufficiency,
@@ -400,6 +404,7 @@ class RAGService:
                         candidates=candidates,
                         reranked=reranked,
                         after_score=after_score,
+                        filter_drops=ev.filter_drops,
                         filtered=filtered,
                         selected=[],
                         cited_chunk_ids=[],
@@ -462,6 +467,7 @@ class RAGService:
             candidates=candidates,
             reranked=reranked,
             after_score=after_score,
+            filter_drops=ev.filter_drops,
             filtered=filtered_before_expansion,
             selected=selected_chunks,
             cited_chunk_ids=[c.chunk_id for c in citations],
@@ -517,6 +523,7 @@ class RAGService:
                         candidates=ev.candidates,
                         reranked=reranked,
                         after_score=after_score,
+                        filter_drops=ev.filter_drops,
                         filtered=filtered,
                         selected=[],
                         cited_chunk_ids=[],
@@ -579,6 +586,7 @@ class RAGService:
             candidates=ev.candidates,
             reranked=reranked,
             after_score=after_score,
+            filter_drops=ev.filter_drops,
             filtered=filtered_before_expansion,
             selected=selected_chunks,
             cited_chunk_ids=[c.chunk_id for c in citations],

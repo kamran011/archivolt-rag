@@ -47,11 +47,22 @@ def build_stages(
     filtered: list[RetrievedChunk],
     selected: list[RetrievedChunk],
     cited_chunk_ids: Iterable[uuid.UUID],
+    filter_drops: Iterable[tuple[RetrievedChunk, str, str]] | None = None,
 ) -> dict:
+    """`filter_drops` (from EvidenceFilter.run_pipeline) attributes each post-score drop to
+    its own stage and reason; without it they are all reported as near-duplicates."""
+    if filter_drops is None:
+        between = excluded(after_score, filtered, "dedupe", REASON_NEAR_DUPLICATE)
+    else:
+        between = [
+            {**b, "stage": stage, "reason": reason}
+            for chunk, stage, reason in filter_drops
+            for b in brief([chunk])
+        ]
     excl = (
         excluded(candidates, reranked, "rerank", REASON_NOT_RERANKED)
         + excluded(reranked, after_score, "score_filter", REASON_BELOW_MIN_SCORE)
-        + excluded(after_score, filtered, "dedupe", REASON_NEAR_DUPLICATE)
+        + between
         + excluded(filtered, selected, "context", REASON_CONTEXT_BUDGET)
     )
     return {

@@ -1,10 +1,11 @@
 import json
 
 import structlog
-from openai import AsyncOpenAI
 
 from app.config import settings
 from app.domains.retrieval.schemas import RetrievedChunk
+from app.providers.llm.base import LLMProvider
+from app.providers.llm.registry import get_llm_provider
 from app.providers.reranker.base import RerankerProvider
 
 logger = structlog.get_logger()
@@ -25,9 +26,18 @@ One entry per passage, in the same order. No other text."""
 
 
 class LLMReranker(RerankerProvider):
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(self, model: str | None = None, llm: LLMProvider | None = None) -> None:
         self.model = model or settings.RERANKER_MODEL
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Goes through the LLM registry like every other LLM use, so any configured
+        # provider (OpenAI, Anthropic, ...) can rerank. Created lazily: constructing
+        # the reranker must not require API keys.
+        self._llm = llm
+
+    @property
+    def llm(self) -> LLMProvider:
+        if self._llm is None:
+            self._llm = get_llm_provider(self.model)
+        return self._llm
 
     async def rerank(
         self,
@@ -65,12 +75,10 @@ class LLMReranker(RerankerProvider):
         )
         prompt = RERANK_PROMPT.format(query=query, passages=passages_text)
 
-        response = await self._client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
+        response = await self.llm.generate(
+            [{"role": "user", "content": prompt}], temperature=0.0, max_tokens=512
         )
-        raw = response.choices[0].message.content or "[]"
+        raw = response.content or "[]"
         raw_scores = self._parse_scores(raw, len(batch))
         # Normalize the model's 0-10 scale to 0-1 so downstream evidence
         # thresholds (calibrated for cosine/RRF scores) stay consistent.

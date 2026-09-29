@@ -26,7 +26,7 @@ from app.domains.retrieval.schemas import (
     RetrievedChunk,
 )
 from app.domains.retrieval.service import retrieval_service
-from app.providers.reranker.llm_reranker import LLMReranker
+from app.providers.reranker.registry import get_reranker
 
 PREVIEW_CHARS = 240
 
@@ -159,7 +159,7 @@ class RetrievalDebugger:
         # 2. Rerank
         t = time.perf_counter()
         before = {c.chunk_id: c.score for c in candidates}
-        reranked = await LLMReranker().rerank(req.query, candidates, top_k=10)
+        reranked = await get_reranker().rerank(req.query, candidates, top_k=10)
         timed_stage(
             "rerank", t,
             [_view(c, verdict=f"was {before[c.chunk_id]:.3f}") for c in reranked],

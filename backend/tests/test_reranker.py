@@ -1,10 +1,10 @@
 import uuid
 from datetime import UTC
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.domains.retrieval.schemas import RetrievedChunk
+from app.providers.llm.base import LLMResponse
 from app.providers.reranker.llm_reranker import LLMReranker
 
 
@@ -20,20 +20,30 @@ def make_chunk(content: str, score: float = 0.5) -> RetrievedChunk:
     )
 
 
-def mock_openai_response(content: str) -> MagicMock:
-    response = MagicMock()
-    response.choices = [MagicMock(message=MagicMock(content=content))]
-    return response
+class FakeLLM:
+    def __init__(self, content: str | None = None, error: Exception | None = None):
+        self.content, self.error = content, error
+
+    async def generate(self, messages, temperature=0.1, max_tokens=2048):
+        if self.error:
+            raise self.error
+        return LLMResponse(
+            content=self.content or "",
+            prompt_tokens=1,
+            completion_tokens=1,
+            model="fake",
+            finish_reason="stop",
+        )
+
+
+def make_reranker(content: str | None = None, error: Exception | None = None) -> LLMReranker:
+    return LLMReranker(model="gpt-4o-mini", llm=FakeLLM(content, error))
 
 
 @pytest.mark.asyncio
 async def test_reranker_sorts_by_llm_score_descending():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response(
-            '[{"index": 0, "relevance_score": 2}, {"index": 1, "relevance_score": 9}]'
-        )
+    reranker = make_reranker(
+        '[{"index": 0, "relevance_score": 2}, {"index": 1, "relevance_score": 9}]'
     )
 
     chunks = [make_chunk("low relevance"), make_chunk("high relevance")]
@@ -45,10 +55,8 @@ async def test_reranker_sorts_by_llm_score_descending():
 
 @pytest.mark.asyncio
 async def test_reranker_normalizes_scores_to_0_1_range():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response('[{"index": 0, "relevance_score": 10}]')
+    reranker = make_reranker(
+        '[{"index": 0, "relevance_score": 10}]'
     )
 
     result = await reranker.rerank("query", [make_chunk("text")], top_k=1)
@@ -57,13 +65,9 @@ async def test_reranker_normalizes_scores_to_0_1_range():
 
 @pytest.mark.asyncio
 async def test_reranker_respects_top_k():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response(
-            '[{"index": 0, "relevance_score": 5}, {"index": 1, "relevance_score": 8}, '
+    reranker = make_reranker(
+        '[{"index": 0, "relevance_score": 5}, {"index": 1, "relevance_score": 8}, '
             '{"index": 2, "relevance_score": 3}]'
-        )
     )
 
     chunks = [make_chunk("a"), make_chunk("b"), make_chunk("c")]
@@ -73,9 +77,7 @@ async def test_reranker_respects_top_k():
 
 @pytest.mark.asyncio
 async def test_reranker_falls_back_to_original_score_on_api_failure():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(side_effect=Exception("API down"))
+    reranker = make_reranker(error=Exception("API down"))
 
     chunks = [make_chunk("text", score=0.42)]
     result = await reranker.rerank("query", chunks, top_k=1)
@@ -86,10 +88,8 @@ async def test_reranker_falls_back_to_original_score_on_api_failure():
 
 @pytest.mark.asyncio
 async def test_reranker_handles_malformed_json_gracefully():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response("not valid json at all")
+    reranker = make_reranker(
+        "not valid json at all"
     )
 
     chunks = [make_chunk("text")]
@@ -101,12 +101,8 @@ async def test_reranker_handles_malformed_json_gracefully():
 
 @pytest.mark.asyncio
 async def test_reranker_strips_markdown_code_fences():
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response(
-            '```json\n[{"index": 0, "relevance_score": 7}]\n```'
-        )
+    reranker = make_reranker(
+        '```json\n[{"index": 0, "relevance_score": 7}]\n```'
     )
 
     result = await reranker.rerank("query", [make_chunk("text")], top_k=1)
@@ -126,10 +122,8 @@ async def test_reranker_preserves_authority_and_version_fields():
     resolution (authority/freshness/version) silently sees defaults."""
     from datetime import datetime
 
-    reranker = LLMReranker(model="gpt-4o-mini")
-    reranker._client = MagicMock()
-    reranker._client.chat.completions.create = AsyncMock(
-        return_value=mock_openai_response('[{"index": 0, "relevance_score": 8}]')
+    reranker = make_reranker(
+        '[{"index": 0, "relevance_score": 8}]'
     )
     when = datetime(2025, 1, 1, tzinfo=UTC)
     chunk = make_chunk("policy text").model_copy(
