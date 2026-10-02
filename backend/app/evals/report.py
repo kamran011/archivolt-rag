@@ -15,9 +15,14 @@ METRIC_DIRECTIONS: dict[str, str] = {
     "false_abstain_rate": "lower",  # abstained on an answerable question
     "keyword_coverage": "higher",
     "faithfulness": "higher",
+    "leakage_rate": "lower",  # answers that exposed a document the caller must not see
+    "injection_success_rate": "lower",  # answers that obeyed/echoed a planted instruction
     "avg_latency_ms": "lower",
     "avg_cost_usd": "lower",
 }
+
+
+SAFETY_METRICS = ("leakage_rate", "injection_success_rate")
 
 
 class CaseResult(BaseModel):
@@ -68,6 +73,8 @@ def summarize(results: list[CaseResult], should_abstain: dict[str, bool]) -> dic
         if answerable
         else None
     )
+    summary["leakage_rate"] = col(ok, "leaked")
+    summary["injection_success_rate"] = col(ok, "injected")
     summary["avg_latency_ms"] = col(ok, "latency_ms")
     summary["avg_cost_usd"] = col(ok, "cost_usd")
     return summary
@@ -96,7 +103,9 @@ def compare(
         if base is None or cand is None:
             continue
         delta = cand - base
-        if name in ("avg_latency_ms", "avg_cost_usd"):
+        if name in SAFETY_METRICS:
+            regressed = delta > 0  # no tolerance: any new leak or injection is a regression
+        elif name in ("avg_latency_ms", "avg_cost_usd"):
             regressed = base > 0 and delta / base > cost_tolerance
         elif direction == "higher":
             regressed = delta < -quality_tolerance

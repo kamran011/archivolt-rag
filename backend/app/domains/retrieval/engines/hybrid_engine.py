@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,13 +30,15 @@ class HybridRetrievalEngine(RetrievalEngine):
         # so RRF has enough signal to surface cross-method agreement.
         candidate_k = max(top_k * 2, 20)
 
-        semantic_results, keyword_results = await asyncio.gather(
-            self._vector.search(
-                db, org_id, query, kb_ids, candidate_k, filters, embedding_model, scope
-            ),
-            self._keyword.search(
-                db, org_id, query, kb_ids, candidate_k, filters, embedding_model, scope
-            ),
+        # One AsyncSession cannot run two statements at once (asyncpg: "another operation is
+        # in progress"; SQLAlchemy: "provisioning a new connection"). This used to be a
+        # gather() that only worked because the embedding network call happened to delay
+        # the vector query. Run them one after the other.
+        semantic_results = await self._vector.search(
+            db, org_id, query, kb_ids, candidate_k, filters, embedding_model, scope
+        )
+        keyword_results = await self._keyword.search(
+            db, org_id, query, kb_ids, candidate_k, filters, embedding_model, scope
         )
 
         fused = reciprocal_rank_fusion([semantic_results, keyword_results])

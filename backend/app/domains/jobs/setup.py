@@ -1,11 +1,14 @@
 """Wiring: the handler registry and the process-wide worker."""
 
+from app.domains.evals.jobs import eval_handler
+from app.domains.evals.service import EVAL_KIND
 from app.domains.ingestion.jobs import INGEST_KIND, ingestion_handler
 from app.domains.jobs import sessions
 from app.domains.jobs.worker import HandlerRegistry, Worker
 
 registry = HandlerRegistry()
 registry.register(INGEST_KIND, ingestion_handler)
+registry.register(EVAL_KIND, eval_handler)
 
 
 def _session():

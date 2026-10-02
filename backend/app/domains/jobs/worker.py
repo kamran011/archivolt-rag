@@ -37,6 +37,8 @@ class JobHandler:
     run: Callable[[Job], Awaitable[None]]
     # Called once when the job ends without success (permanent failure or retries exhausted).
     on_dead: Callable[[Job, str], Awaitable[None]] | None = None
+    # Overrides settings.JOB_TIMEOUT_S for long-running kinds (e.g. evaluation runs).
+    timeout_s: float | None = None
 
 
 class HandlerRegistry:
@@ -98,13 +100,14 @@ class Worker:
         handler = self.registry.get(job.kind)
         if handler is None:  # cannot happen through claim(kinds=...), but never crash on it
             return await self._finish(job, "no handler registered", permanent=True, handler=None)
+        timeout = handler.timeout_s or settings.JOB_TIMEOUT_S
         try:
-            await asyncio.wait_for(handler.run(job), timeout=settings.JOB_TIMEOUT_S)
+            await asyncio.wait_for(handler.run(job), timeout=timeout)
         except PermanentJobError as e:
             return await self._finish(job, str(e), permanent=True, handler=handler)
         except TimeoutError:
             return await self._finish(
-                job, f"timed out after {settings.JOB_TIMEOUT_S}s", permanent=False, handler=handler
+                job, f"timed out after {timeout}s", permanent=False, handler=handler
             )
         except Exception as e:
             logger.warning("job_attempt_failed", kind=job.kind, job_id=str(job.id), error=str(e))

@@ -16,6 +16,10 @@ class EvalCase(BaseModel):
     should_abstain: bool = False
     """True for questions the knowledge base cannot answer."""
     tags: list[str] = Field(default_factory=list)
+    forbidden_documents: list[str] = Field(default_factory=list)
+    """Titles the evaluated caller must NOT see: any citation or mention is a leak."""
+    canary: str | None = None
+    """A marker planted in a malicious document; it must never appear in the answer."""
 
     @model_validator(mode="after")
     def _has_ground_truth(self) -> "EvalCase":
@@ -27,22 +31,26 @@ class EvalCase(BaseModel):
         return self
 
 
-def load_dataset(path: str | Path) -> list[EvalCase]:
-    """Loads a JSONL dataset; blank lines and '#' comment lines are ignored."""
+def parse_dataset(text: str, source: str = "dataset") -> list[EvalCase]:
+    """Parses JSONL; blank lines and '#' comment lines are ignored."""
     cases: list[EvalCase] = []
     seen: set[str] = set()
-    for lineno, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, line in enumerate(text.splitlines(), start=1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         try:
             case = EvalCase.model_validate(json.loads(line))
         except (json.JSONDecodeError, ValidationError) as e:
-            raise ValueError(f"{path}:{lineno}: invalid eval case: {e}") from e
+            raise ValueError(f"{source}:{lineno}: invalid eval case: {e}") from e
         if case.id in seen:
-            raise ValueError(f"{path}:{lineno}: duplicate case id {case.id!r}")
+            raise ValueError(f"{source}:{lineno}: duplicate case id {case.id!r}")
         seen.add(case.id)
         cases.append(case)
     if not cases:
-        raise ValueError(f"{path}: dataset is empty")
+        raise ValueError(f"{source}: dataset is empty")
     return cases
+
+
+def load_dataset(path: str | Path) -> list[EvalCase]:
+    return parse_dataset(Path(path).read_text(encoding="utf-8"), str(path))
