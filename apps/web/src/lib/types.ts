@@ -32,14 +32,13 @@ export interface Organization {
 export interface OrgMember {
   id: string;
   user_id: string;
-  email: string;
   role: OrgRole;
   created_at: string;
 }
 
 // ─── Knowledge Bases ──────────────────────────────────────────────────────────
 
-export type ChunkStrategy = "fixed" | "structure_aware";
+export type ChunkStrategy = "fixed" | "structure_aware" | "semantic" | "agentic";
 export type KBStatus = "active" | "archived";
 
 export interface KnowledgeBase {
@@ -53,13 +52,16 @@ export interface KnowledgeBase {
   chunk_overlap: number;
   status: KBStatus;
   document_count: number;
+  cag_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
 
-export type FileType = "pdf" | "docx" | "md" | "txt" | "html" | "csv" | "json";
+export type FileType = "pdf" | "docx" | "md" | "txt" | "html" | "csv" | "json" | "image";
+export type AuthorityTier = "official" | "standard" | "draft" | "informal";
+export type AnswerMode = "rag" | "cag" | "hybrid";
 export type DocumentStatus =
   | "pending"
   | "parsing"
@@ -80,6 +82,14 @@ export interface Document {
   page_count: number | null;
   chunk_count: number;
   error_message: string | null;
+  version: number;
+  is_current: boolean;
+  supersedes_document_id: string | null;
+  superseded_at: string | null;
+  effective_date: string | null;
+  authority_tier: AuthorityTier;
+  tags: string[];
+  restricted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -106,6 +116,9 @@ export interface Citation {
   content: string;
   page_number: number | null;
   relevance_score: number;
+  // 'external' = public web result (lower authority); url is only set for those.
+  source_type?: "internal" | "external";
+  url?: string | null;
 }
 
 export interface Message {
@@ -253,4 +266,110 @@ export interface UsageSummary {
   avg_stage_ms: Record<string, number>;
   daily: DailyUsage[];
   truncated: boolean;
+}
+
+// ─── Knowledge-base extras, document inspector ───────────────────────────────
+
+export interface CagInfo {
+  enabled: boolean;
+  eligible: boolean;
+  reason: string | null;
+  tokens: number;
+  limit: number;
+}
+
+export interface DocumentChunk {
+  id: string;
+  chunk_index: number;
+  token_count: number;
+  content: string;
+  metadata: Record<string, unknown>;
+  has_embedding: boolean;
+}
+
+export interface ChunkPage {
+  total: number;
+  items: DocumentChunk[];
+}
+
+export interface TreeNode {
+  node_id: string;
+  title: string;
+  level: number;
+  chunk_indices: number[];
+  summary?: string | null;
+  children: TreeNode[];
+}
+
+export interface DocumentTree {
+  document_id: string;
+  nodes: TreeNode[];
+}
+
+export interface DocumentSummaryItem {
+  level: string;
+  node_id: string | null;
+  title: string;
+  summary: string;
+}
+
+export interface DocumentSummaries {
+  document_id: string;
+  items: DocumentSummaryItem[];
+}
+
+export interface DocumentUpdate {
+  authority_tier?: AuthorityTier;
+  effective_date?: string | null;
+  tags?: string[];
+  restricted?: boolean;
+}
+
+// ─── Evaluation ──────────────────────────────────────────────────────────────
+
+export type RetrievalStrategyName = "semantic" | "keyword" | "hybrid" | "tree" | "summary";
+
+export interface EvalDataset {
+  id: string;
+  name: string;
+  case_count: number;
+  created_at: string;
+}
+
+export interface EvalRunConfig {
+  strategy: RetrievalStrategyName;
+  mode: AnswerMode;
+  agentic: boolean;
+  k: number;
+  retrieval_only: boolean;
+  access: "restricted" | "admin";
+}
+
+export interface EvalCaseResult {
+  case_id: string;
+  tags: string[];
+  metrics: Record<string, number | null>;
+  error: string | null;
+}
+
+export interface EvalRun {
+  id: string;
+  dataset_id: string;
+  config: EvalRunConfig;
+  status: "queued" | "running" | "succeeded" | "failed";
+  summary: Record<string, number | null> | null;
+  total_cases: number | null;
+  failed_cases: number | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+  results?: EvalCaseResult[] | null;
+}
+
+export interface MetricDelta {
+  metric: string;
+  baseline: number;
+  candidate: number;
+  delta: number;
+  regressed: boolean;
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
   AbstentionReason,
+  AnswerMode,
   AgentSummary,
   Citation,
   ConflictInfo,
@@ -34,6 +35,8 @@ interface StreamChatParams {
   organizationId: string;
   model?: string;
   agentic?: boolean;
+  webSearch?: boolean;
+  mode?: AnswerMode;
 }
 
 /**
@@ -63,6 +66,8 @@ export async function* streamChat(
       model: params.model || "gpt-4o",
       stream: true,
       agentic: params.agentic ?? false,
+      web_search: params.webSearch ?? false,
+      mode: params.mode ?? "rag",
     }),
   });
 

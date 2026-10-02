@@ -3,7 +3,7 @@
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
-import type { Document } from "@/lib/types";
+import type { Document, DocumentUpdate } from "@/lib/types";
 
 export function useDocuments(kbId: string) {
   const { currentOrg } = useOrganization();
@@ -33,5 +33,16 @@ export function useDocuments(kbId: string) {
     update((prev) => (prev ?? []).filter((d) => d.id !== docId));
   }
 
-  return { documents, loading, error, uploadDocument, deleteDocument, refresh };
+  async function updateDocument(docId: string, patch: DocumentUpdate): Promise<Document> {
+    if (!currentOrg) throw new Error("No organization selected");
+    const doc = await api.patch<Document>(
+      `/api/v1/knowledge-bases/${kbId}/documents/${docId}`,
+      patch,
+      currentOrg.id
+    );
+    update((prev) => (prev ?? []).map((d) => (d.id === docId ? doc : d)));
+    return doc;
+  }
+
+  return { documents, loading, error, uploadDocument, deleteDocument, updateDocument, refresh };
 }

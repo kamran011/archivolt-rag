@@ -5,6 +5,7 @@ import { streamChat } from "@/lib/streamChat";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type {
   AbstentionReason,
+  AnswerMode,
   AgentSummary,
   Citation,
   ConflictInfo,
@@ -27,7 +28,16 @@ export interface ChatMessage {
   streaming?: boolean;
 }
 
-export function useChat(knowledgeBaseIds: string[], agentic = false) {
+export interface ChatOptions {
+  agentic: boolean;
+  webSearch: boolean;
+  mode: AnswerMode;
+}
+
+export function useChat(
+  knowledgeBaseIds: string[],
+  { agentic, webSearch, mode }: ChatOptions,
+) {
   const { currentOrg } = useOrganization();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -62,6 +72,8 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
           conversationId: conversationId || undefined,
           organizationId: currentOrg.id,
           agentic,
+          webSearch,
+          mode,
         })) {
           if (event.type === "token") {
             setMessages((prev) =>
@@ -105,7 +117,7 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
         setIsStreaming(false);
       }
     },
-    [currentOrg, knowledgeBaseIds, conversationId, agentic]
+    [currentOrg, knowledgeBaseIds, conversationId, agentic, webSearch, mode]
   );
 
   function resetConversation() {

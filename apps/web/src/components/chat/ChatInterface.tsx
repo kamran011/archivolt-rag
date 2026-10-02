@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useChat } from "@/hooks/useChat";
+import { useOrganization } from "@/providers/OrganizationProvider";
+import type { AnswerMode } from "@/lib/types";
 import MessageBubble from "@/components/chat/MessageBubble";
 import ChatInput from "@/components/chat/ChatInput";
 import KBSelector from "@/components/chat/KBSelector";
@@ -10,7 +12,16 @@ import ChatAvatar from "@/components/chat/ChatAvatar";
 export default function ChatInterface() {
   const [selectedKbIds, setSelectedKbIds] = useState<string[]>([]);
   const [agentic, setAgentic] = useState(false);
-  const { messages, sendMessage, isStreaming, error } = useChat(selectedKbIds, agentic);
+  const [webSearch, setWebSearch] = useState(false);
+  const [mode, setMode] = useState<AnswerMode>("rag");
+  const { currentOrg } = useOrganization();
+  // Web search needs the deployment flag AND this opt-in; the server enforces both.
+  const webSearchAllowed = currentOrg?.settings?.web_search_enabled === true;
+  const { messages, sendMessage, isStreaming, error } = useChat(selectedKbIds, {
+    agentic,
+    webSearch: webSearch && webSearchAllowed,
+    mode,
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,6 +59,45 @@ export default function ChatInterface() {
             searches for multi-part questions. Slower and costs more.
           </span>
         </label>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-text-muted">
+          <label className="flex items-center gap-2">
+            <span className="font-medium text-text">Answer mode</span>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as AnswerMode)}
+              className="rounded-md border border-border bg-bg-white px-2 py-1 text-xs"
+            >
+              <option value="rag">Retrieval (RAG)</option>
+              <option value="cag">Full context (CAG)</option>
+              <option value="hybrid">Full context, fall back to RAG</option>
+            </select>
+          </label>
+          <label
+            className={`flex items-center gap-2 ${webSearchAllowed ? "cursor-pointer" : "opacity-60"}`}
+            title={
+              webSearchAllowed
+                ? undefined
+                : "An organization admin must enable web search in Settings"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={webSearch && webSearchAllowed}
+              disabled={!webSearchAllowed}
+              onChange={(e) => setWebSearch(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-text">Web search</span> when the knowledge base
+              falls short
+            </span>
+          </label>
+        </div>
+        {mode !== "rag" && (
+          <p className="mt-2 text-[11px] text-text-muted">
+            Full-context mode only works for knowledge bases an admin enabled for it and that fit
+            the context budget; otherwise it falls back to retrieval.
+          </p>
+        )}
       </div>
 
       {/* Messages */}
