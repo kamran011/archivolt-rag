@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Dummy values: tests never reach OpenAI/Anthropic/Supabase (network is blocked in conftest).
+  SUPABASE_URL: http://localhost:54321
+  SUPABASE_ANON_KEY: anon
+  SUPABASE_SERVICE_ROLE_KEY: service
+  SUPABASE_DB_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
+  JWT_SECRET: ci-secret-ci-secret-ci-secret-1234
+  OPENAI_API_KEY: ci
+  ANTHROPIC_API_KEY: ci
+
+jobs:
+  backend:
+    name: Backend (ruff, unit + Postgres integration tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Same image as `supabase start`: pgvector, auth schema, roles, extensions.
+        image: supabase/postgres:15.8.1.085
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h localhost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check app tests
+      - name: Apply migrations (each in a single transaction, like a fresh `supabase db reset`)
+        working-directory: .
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for f in supabase/migrations/*.sql; do
+            echo "applying $f"
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction -q -f "$f"
+          done
+      - name: Tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
+        run: uv run pytest -q
+
+  web:
+    name: Web (lint, typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: anon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
