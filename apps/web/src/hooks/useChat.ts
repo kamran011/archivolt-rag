@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { streamChat } from "@/lib/streamChat";
+import { api } from "@/lib/api";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type {
   AbstentionReason,
@@ -44,15 +45,76 @@ export interface ChatOptions {
   mode: AnswerMode;
 }
 
+interface ApiMessage {
+  id: string;
+  role: MessageRole;
+  content: string;
+  citations: Citation[] | null;
+  abstained: boolean;
+  created_at: string;
+}
+
+interface ApiConversationDetail {
+  id: string;
+  knowledge_base_id: string | null;
+  title: string | null;
+  messages: ApiMessage[];
+}
+
+function apiMessageToChatMessage(m: ApiMessage, allMessages: ApiMessage[]): ChatMessage {
+  const userBefore = [...allMessages]
+    .slice(0, allMessages.indexOf(m))
+    .reverse()
+    .find((x) => x.role === "user");
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    citations: m.citations ?? undefined,
+    abstained: m.abstained || undefined,
+    question: m.role === "assistant" ? userBefore?.content : undefined,
+  };
+}
+
 export function useChat(
   knowledgeBaseIds: string[],
   { agentic, webSearch, mode }: ChatOptions,
+  initialConversationId?: string,
 ) {
   const { currentOrg } = useOrganization();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    initialConversationId ?? null
+  );
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!initialConversationId);
+
+  // Load existing conversation on mount
+  useEffect(() => {
+    if (!initialConversationId || !currentOrg) return;
+    let cancelled = false;
+    setLoading(true);
+    api
+      .get<ApiConversationDetail>(
+        `/api/v1/chat/conversations/${initialConversationId}`,
+        currentOrg.id
+      )
+      .then((conv) => {
+        if (cancelled) return;
+        setMessages(conv.messages.map((m) => apiMessageToChatMessage(m, conv.messages)));
+        setConversationId(conv.id);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Could not load conversation history.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialConversationId, currentOrg]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -143,5 +205,5 @@ export function useChat(
     setError(null);
   }
 
-  return { messages, sendMessage, isStreaming, error, conversationId, resetConversation };
+  return { messages, sendMessage, isStreaming, error, conversationId, resetConversation, loading };
 }
