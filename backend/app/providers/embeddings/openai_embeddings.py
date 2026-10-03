@@ -4,7 +4,7 @@ import structlog
 from openai import APIError, AsyncOpenAI, RateLimitError
 
 from app.config import settings
-from app.core.exceptions import ProviderError
+from app.core.exceptions import provider_error
 from app.providers.embeddings.base import EmbeddingProvider
 
 logger = structlog.get_logger()
@@ -59,8 +59,8 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                 backoff *= 2
             except APIError as e:
                 last_error = e
-                logger.error("embedding_api_error", error=str(e), attempt=attempt)
+                logger.error("embedding_api_error", error_type=type(e).__name__, status=getattr(e, "status_code", None), attempt=attempt)
                 await asyncio.sleep(backoff)
                 backoff *= 2
 
-        raise ProviderError(f"Embedding generation failed after {MAX_RETRIES} attempts: {last_error}")
+        raise provider_error("OpenAI", "embedding", last_error) from last_error

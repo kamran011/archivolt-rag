@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from anthropic import AsyncAnthropic
 
 from app.config import settings
-from app.core.exceptions import ProviderError
+from app.core.exceptions import provider_error
 from app.providers.llm.base import LLMProvider, LLMResponse
 
 
@@ -39,7 +39,7 @@ class AnthropicProvider(LLMProvider):
                 max_tokens=max_tokens,
             )
         except Exception as e:
-            raise ProviderError(f"Anthropic generation failed: {e}") from e
+            raise provider_error("Anthropic", "generation", e) from e
 
         text = "".join(block.text for block in response.content if block.type == "text")
         return LLMResponse(
@@ -68,4 +68,4 @@ class AnthropicProvider(LLMProvider):
                 async for text in stream.text_stream:
                     yield text
         except Exception as e:
-            raise ProviderError(f"Anthropic streaming failed: {e}") from e
+            raise provider_error("Anthropic", "streaming", e) from e
