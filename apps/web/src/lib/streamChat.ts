@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/client";
-import type { AgentSummary, Citation, ConflictInfo, EvidenceGateResult } from "@/lib/types";
+import type {
+  AbstentionReason,
+  AnswerMode,
+  AgentSummary,
+  Citation,
+  ClaimVerification,
+  ConflictInfo,
+  CostMetadata,
+  EvidenceGateResult,
+  TraceMeta,
+  VerificationStatus,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -8,8 +19,16 @@ export interface ChatStreamEvent {
   content?: string;
   conversation_id?: string;
   abstained?: boolean;
+  abstention_reason?: AbstentionReason | null;
+  verification_status?: VerificationStatus;
+  // Set when verification changed the answer after it was streamed; replaces the shown text.
+  final_answer?: string | null;
   citations?: Citation[];
-  claim_verifications?: unknown[];
+  claim_verifications?: ClaimVerification[];
+  cost_metadata?: CostMetadata;
+  trace_id?: string;
+  span_ms?: Record<string, number | null>;
+  trace_stages?: { meta?: TraceMeta };
   conflicts?: ConflictInfo[];
   agent?: AgentSummary;
   evidence_gate?: EvidenceGateResult;
@@ -23,6 +42,8 @@ interface StreamChatParams {
   organizationId: string;
   model?: string;
   agentic?: boolean;
+  webSearch?: boolean;
+  mode?: AnswerMode;
 }
 
 /**
@@ -49,9 +70,12 @@ export async function* streamChat(
       message: params.message,
       knowledge_base_ids: params.knowledgeBaseIds,
       conversation_id: params.conversationId,
-      model: params.model || "gpt-4o",
+      // Omitted unless set: the server applies its configured DEFAULT_LLM_MODEL.
+      ...(params.model ? { model: params.model } : {}),
       stream: true,
       agentic: params.agentic ?? false,
+      web_search: params.webSearch ?? false,
+      mode: params.mode ?? "rag",
     }),
   });
 

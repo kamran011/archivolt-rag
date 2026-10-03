@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.domains.auth.dependencies import get_current_user
-from app.domains.documents.service import DocumentService
 from app.domains.knowledge_bases.schemas import KBCreate
 from app.domains.knowledge_bases.service import KnowledgeBaseService
 from app.domains.organizations.schemas import OrgCreate
@@ -73,7 +72,7 @@ async def test_get_current_user_rejects_org_with_no_membership_row(sqlite_sessio
     org_service = OrganizationService()
     user_a = uuid.uuid4()
 
-    org_a = await org_service.create(sqlite_session, user_a, OrgCreate(name="Org A", slug="org-a"))
+    await org_service.create(sqlite_session, user_a, OrgCreate(name="Org A", slug="org-a"))
     org_b = await org_service.create(sqlite_session, uuid.uuid4(), OrgCreate(name="Org B", slug="org-b"))
     await sqlite_session.commit()
 

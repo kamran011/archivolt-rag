@@ -28,6 +28,7 @@ def _print_summary(report: EvalReport) -> None:
 
 async def _run(args: argparse.Namespace) -> int:
     from app.core.database import AsyncSessionLocal
+    from app.domains.retrieval.access import AccessScope
     from app.evals.runner import run_eval
 
     report = await run_eval(
@@ -41,6 +42,8 @@ async def _run(args: argparse.Namespace) -> int:
         agentic=args.agentic,
         retrieval_only=args.retrieval_only,
         concurrency=args.concurrency,
+        mode=args.mode,
+        scope=AccessScope(user_id=None, is_admin=args.as_admin),
     )
     if args.output:
         Path(args.output).write_text(report.model_dump_json(indent=2), encoding="utf-8")
@@ -73,6 +76,9 @@ def main() -> None:
     run.add_argument("--kb", required=True, nargs="+")
     run.add_argument("--strategy", default="hybrid",
                      choices=["semantic", "keyword", "hybrid", "tree"])
+    run.add_argument("--mode", default="rag", choices=["rag", "cag", "hybrid"])
+    run.add_argument("--as-admin", action="store_true",
+                     help="evaluate as an admin (default: least-privileged caller)")
     run.add_argument("--k", type=int, default=5)
     run.add_argument("--agentic", action="store_true")
     run.add_argument("--retrieval-only", action="store_true")

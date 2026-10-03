@@ -1,5 +1,9 @@
 from app.domains.ingestion.parsers.base import BaseParser
+from app.domains.ingestion.parsers.csv_parser import CSVParser
 from app.domains.ingestion.parsers.docx_parser import DocxParser
+from app.domains.ingestion.parsers.html_parser import HTMLDocumentParser
+from app.domains.ingestion.parsers.image_parser import ImageParser
+from app.domains.ingestion.parsers.json_parser import JSONParser
 from app.domains.ingestion.parsers.markdown_parser import MarkdownParser
 from app.domains.ingestion.parsers.pdf_parser import PDFParser
 from app.domains.ingestion.parsers.text_parser import TextParser
@@ -10,9 +14,10 @@ _REGISTRY: dict[FileType, type[BaseParser]] = {
     FileType.docx: DocxParser,
     FileType.md: MarkdownParser,
     FileType.txt: TextParser,
-    FileType.html: TextParser,  # basic fallback until a dedicated HTML parser is added
-    FileType.csv: TextParser,
-    FileType.json: TextParser,
+    FileType.html: HTMLDocumentParser,
+    FileType.csv: CSVParser,
+    FileType.json: JSONParser,
+    FileType.image: ImageParser,
 }
 
 
@@ -23,4 +28,15 @@ def get_parser(file_type: FileType) -> BaseParser:
     return parser_cls()
 
 
-__all__ = ["BaseParser", "PDFParser", "DocxParser", "MarkdownParser", "TextParser", "get_parser"]
+__all__ = [
+    "BaseParser",
+    "CSVParser",
+    "DocxParser",
+    "HTMLDocumentParser",
+    "ImageParser",
+    "JSONParser",
+    "MarkdownParser",
+    "PDFParser",
+    "TextParser",
+    "get_parser",
+]

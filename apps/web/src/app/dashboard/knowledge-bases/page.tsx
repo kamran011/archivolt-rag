@@ -31,7 +31,11 @@ export default function KnowledgeBasesPage() {
         </div>
       ) : !currentOrg ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="text-4xl mb-3">🏢</div>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint">
+            <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7a1 1 0 011-1h5a1 1 0 011 1v14M14 21V4a1 1 0 011-1h4a1 1 0 011 1v17M8 9h1m-1 4h1m-1 4h1m5-10h1m-1 4h1m-1 4h1" />
+            </svg>
+          </div>
           <h2 className="font-medium text-gray-900 mb-1">No organization yet</h2>
           <p className="text-gray-500 text-sm mb-4">
             You need to create a workspace first.
@@ -49,7 +53,11 @@ export default function KnowledgeBasesPage() {
         </div>
       ) : knowledgeBases.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="text-4xl mb-3">📚</div>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint">
+            <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
           <h2 className="font-medium text-gray-900 mb-1">No knowledge bases yet</h2>
           <p className="text-gray-500 text-sm mb-4">
             Create your first knowledge base to start uploading documents.

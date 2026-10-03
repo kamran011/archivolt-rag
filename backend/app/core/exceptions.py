@@ -35,7 +35,45 @@ class StorageError(ArchivoltError):
 
 
 class ProviderError(ArchivoltError):
-    pass
+    """An upstream LLM/embedding provider call failed. The message is safe to show to users:
+    provider error bodies can quote parts of the API key, so build it with
+    `provider_error()` rather than interpolating the raw exception."""
+
+
+def provider_error(provider: str, operation: str, exc: BaseException) -> ProviderError:
+    """Classifies a provider SDK exception into a user-safe ProviderError, logging only the
+    exception type and HTTP status (never its message)."""
+    import structlog
+
+    status = getattr(exc, "status_code", None)
+    structlog.get_logger().error(
+        "provider_call_failed",
+        provider=provider,
+        operation=operation,
+        error_type=type(exc).__name__,
+        status=status,
+    )
+    if status in (401, 403):
+        reason = "the provider rejected the server's API credentials"
+    elif status == 429:
+        reason = "the provider rate limit or quota was reached"
+    elif status is not None and status >= 500:
+        reason = "the provider is temporarily unavailable"
+    elif "timeout" in type(exc).__name__.lower():
+        reason = "the provider timed out"
+    else:
+        reason = "an unexpected provider error occurred"
+    return ProviderError(f"{provider} {operation} failed: {reason}")
+
+
+class RateLimitError(ArchivoltError):
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: int = 1) -> None:
+        super().__init__(message)
+        self.retry_after = max(1, int(retry_after))
+
+
+class BudgetExceededError(ArchivoltError):
+    """The organization has used its daily LLM budget."""
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -66,3 +104,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ProviderError)
     async def provider_handler(request: Request, exc: ProviderError) -> JSONResponse:
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(RateLimitError)
+    async def rate_limit_handler(request: Request, exc: RateLimitError) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": str(exc)},
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    @app.exception_handler(BudgetExceededError)
+    async def budget_handler(request: Request, exc: BudgetExceededError) -> JSONResponse:
+        return JSONResponse(status_code=429, content={"detail": str(exc)})

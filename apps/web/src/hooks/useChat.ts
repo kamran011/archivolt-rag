@@ -4,11 +4,16 @@ import { useCallback, useState } from "react";
 import { streamChat } from "@/lib/streamChat";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type {
+  AbstentionReason,
+  AnswerMode,
   AgentSummary,
   Citation,
+  ClaimVerification,
   ConflictInfo,
+  CostMetadata,
   EvidenceGateResult,
   MessageRole,
+  VerificationStatus,
 } from "@/lib/types";
 
 export interface ChatMessage {
@@ -17,13 +22,32 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   abstained?: boolean;
+  abstentionReason?: AbstentionReason | null;
+  verificationStatus?: VerificationStatus;
   evidenceGate?: EvidenceGateResult;
   conflicts?: ConflictInfo[];
   agent?: AgentSummary;
+  claims?: ClaimVerification[];
+  cost?: CostMetadata;
+  traceId?: string;
+  spanMs?: Record<string, number | null>;
+  strategy?: string;
+  answerMode?: string;
+  /** The user question this answer responds to (shown in the evidence panel). */
+  question?: string;
   streaming?: boolean;
 }
 
-export function useChat(knowledgeBaseIds: string[], agentic = false) {
+export interface ChatOptions {
+  agentic: boolean;
+  webSearch: boolean;
+  mode: AnswerMode;
+}
+
+export function useChat(
+  knowledgeBaseIds: string[],
+  { agentic, webSearch, mode }: ChatOptions,
+) {
   const { currentOrg } = useOrganization();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -45,6 +69,7 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
         id: assistantId,
         role: "assistant",
         content: "",
+        question: content,
         streaming: true,
       };
 
@@ -58,6 +83,8 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
           conversationId: conversationId || undefined,
           organizationId: currentOrg.id,
           agentic,
+          webSearch,
+          mode,
         })) {
           if (event.type === "token") {
             setMessages((prev) =>
@@ -73,11 +100,20 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
                   ? {
                       ...m,
                       streaming: false,
+                      content: event.final_answer ?? m.content,
                       citations: event.citations,
                       abstained: event.abstained,
+                      abstentionReason: event.abstention_reason,
+                      verificationStatus: event.verification_status,
                       evidenceGate: event.evidence_gate,
                       conflicts: event.conflicts,
                       agent: event.agent,
+                      claims: event.claim_verifications,
+                      cost: event.cost_metadata,
+                      traceId: event.trace_id,
+                      spanMs: event.span_ms,
+                      strategy: event.trace_stages?.meta?.strategy,
+                      answerMode: event.trace_stages?.meta?.answer_mode,
                     }
                   : m
               )
@@ -98,7 +134,7 @@ export function useChat(knowledgeBaseIds: string[], agentic = false) {
         setIsStreaming(false);
       }
     },
-    [currentOrg, knowledgeBaseIds, conversationId, agentic]
+    [currentOrg, knowledgeBaseIds, conversationId, agentic, webSearch, mode]
   );
 
   function resetConversation() {

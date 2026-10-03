@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.domains.rag.schemas import RAGRequest
 from app.domains.rag.service import rag_service
+from app.domains.retrieval.access import AccessScope, Actor
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievalStrategy
 from app.domains.retrieval.service import retrieval_service
 from app.evals import metrics
 from app.evals.dataset import EvalCase
 from app.evals.report import CaseResult, EvalReport, summarize
+from app.models.organization_member import OrgRole
 
 logger = structlog.get_logger()
 
@@ -32,6 +34,8 @@ async def _run_case(
     agentic: bool,
     model: str,
     retrieval_only: bool,
+    mode: str,
+    scope: AccessScope,
 ) -> CaseResult:
     m: dict[str, float | None] = {}
     async with session_factory() as db:
@@ -42,6 +46,7 @@ async def _run_case(
                 RetrievalRequest(
                     query=case.question, knowledge_base_ids=kb_ids, strategy=strategy, top_k=k
                 ),
+                scope=scope,
             )
             chunks = result.chunks
             m["hit_rate"] = metrics.hit_at_k(chunks, case, k)
@@ -56,7 +61,13 @@ async def _run_case(
                 db,
                 org_id,
                 RAGRequest(
-                    query=case.question, knowledge_base_ids=kb_ids, model=model, agentic=agentic
+                    query=case.question, knowledge_base_ids=kb_ids, model=model,
+                    agentic=agentic, mode=mode,
+                ),
+                scope=scope,
+                actor=Actor(
+                    user_id=scope.user_id,
+                    role=OrgRole.admin if scope.is_admin else OrgRole.member,
                 ),
             )
             m["latency_ms"] = round((time.perf_counter() - start) * 1000, 2)
@@ -69,6 +80,12 @@ async def _run_case(
                     response.answer, case.expected_keywords
                 )
                 m["faithfulness"] = metrics.faithfulness(response.claim_verifications)
+            if case.forbidden_documents:
+                m["leaked"] = metrics.leaked(
+                    response.answer, response.citations, case.forbidden_documents
+                )
+            if case.canary:
+                m["injected"] = metrics.injected(response.answer, case.canary)
     return CaseResult(case_id=case.id, tags=case.tags, metrics=m)
 
 
@@ -85,11 +102,16 @@ async def run_eval(
     model: str | None = None,
     retrieval_only: bool = False,
     concurrency: int = 2,
+    mode: str = "rag",
+    scope: AccessScope | None = None,
 ) -> EvalReport:
     """Runs every case (each in its own DB session) and aggregates a report.
     A failing case is recorded with its error and excluded from averages, so
     one flaky LLM call cannot sink a whole run."""
     model = model or settings.DEFAULT_LLM_MODEL
+    # Default is the least-privileged caller (unrestricted documents only), so a run can
+    # show whether restricted content leaks; pass an admin scope to evaluate as an admin.
+    scope = scope or AccessScope(user_id=None, is_admin=False)
     sem = asyncio.Semaphore(concurrency)
 
     async def guarded(case: EvalCase) -> CaseResult:
@@ -98,7 +120,7 @@ async def run_eval(
                 return await _run_case(
                     session_factory, org_id, kb_ids, case,
                     strategy=strategy, k=k, agentic=agentic, model=model,
-                    retrieval_only=retrieval_only,
+                    retrieval_only=retrieval_only, mode=mode, scope=scope,
                 )
             except Exception as e:
                 logger.warning("eval_case_failed", case_id=case.id, error=str(e))
@@ -110,7 +132,8 @@ async def run_eval(
         dataset=dataset_name,
         config={
             "strategy": strategy, "agentic": agentic, "model": model,
-            "retrieval_only": retrieval_only,
+            "retrieval_only": retrieval_only, "mode": mode,
+            "access": "admin" if scope.is_admin else "restricted",
             "routing": settings.ENABLE_ADAPTIVE_ROUTING,
             "neighbor_expansion": settings.ENABLE_NEIGHBOR_EXPANSION,
         },

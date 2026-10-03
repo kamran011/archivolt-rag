@@ -34,7 +34,7 @@ def planner(*actions, tokens=(100, 20)):
 def retriever(results_by_query: dict[str, list[RetrievedChunk]] | None = None):
     calls = []
 
-    async def retrieve(db, org_id, request, embedding_model="x"):
+    async def retrieve(db, org_id, request, embedding_model="x", scope=None):
         calls.append((org_id, request))
         chunks = (results_by_query or {}).get(request.query, [])
         return RetrievalResult(
@@ -50,7 +50,7 @@ def retriever(results_by_query: dict[str, list[RetrievedChunk]] | None = None):
 async def run_agent(llm, retr, question="q", org_id=None, kb_ids=None):
     with (
         patch("app.domains.agent.retrieval_agent.get_llm_provider", return_value=llm),
-        patch("app.domains.agent.retrieval_agent.retrieval_service", retr),
+        patch("app.domains.tools.search_tools.retrieval_service", retr),
     ):
         return await RetrievalAgent().run(
             MagicMock(), org_id or uuid.uuid4(), question, kb_ids or [uuid.uuid4()]
@@ -159,7 +159,7 @@ async def test_max_steps_bound(monkeypatch):
     counter = iter(range(100))
     retr = MagicMock()
 
-    async def retrieve(db, org_id, request, embedding_model="x"):
+    async def retrieve(db, org_id, request, embedding_model="x", scope=None):
         return RetrievalResult(
             chunks=[chunk(f"c{next(counter)}")], query=request.query, strategy="hybrid",
             total_candidates=1, retrieval_time_ms=1.0,
@@ -178,7 +178,7 @@ async def test_token_budget_bound(monkeypatch):
     retr = MagicMock()
     n = iter(range(100))
 
-    async def retrieve(db, org_id, request, embedding_model="x"):
+    async def retrieve(db, org_id, request, embedding_model="x", scope=None):
         return RetrievalResult(
             chunks=[chunk(f"c{next(n)}")], query=request.query, strategy="hybrid",
             total_candidates=1, retrieval_time_ms=1.0,
@@ -234,7 +234,9 @@ async def test_agent_error_never_raises():
     retr = MagicMock()
     retr.retrieve = AsyncMock(side_effect=RuntimeError("db down"))
     result = await run_agent(planner(), retr)
-    assert result.stop_reason == "error" and result.chunks == []
+    # A failing tool is contained by the executor (and audited) instead of aborting the run.
+    assert result.chunks == []
+    assert [(a.tool, a.status) for a in result.tool_audit] == [("knowledge_base_search", "error")]
 
 
 @pytest.mark.asyncio
@@ -274,9 +276,9 @@ async def test_rag_uses_agent_only_when_requested():
                      new=AsyncMock(return_value=normal)),
     ):
         off = await rag_service_module._retrieve_candidates(MagicMock(), uuid.uuid4(),
-                                                            request_off, route)
+                                                            request_off, route, None)
         on = await rag_service_module._retrieve_candidates(MagicMock(), uuid.uuid4(),
-                                                           request_on, route)
+                                                           request_on, route, None)
     assert off.agent is None and off.strategy == "hybrid"
     assert on.agent is agent_result and on.strategy == "agentic"
     assert agent_run.await_count == 1

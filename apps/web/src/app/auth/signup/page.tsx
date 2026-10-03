@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -19,7 +19,7 @@ export default function SignupPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
@@ -28,6 +28,10 @@ export default function SignupPage() {
     if (error) {
       setError(error.message);
       setLoading(false);
+    } else if (data.session) {
+      // Email confirmation is disabled (e.g. local dev): the user is already signed in.
+      router.replace("/dashboard");
+      router.refresh();
     } else {
       setSuccess(true);
       setLoading(false);
@@ -39,7 +43,12 @@ export default function SignupPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-full max-w-md text-center">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-            <div className="text-4xl mb-4">✉️</div>
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint">
+              <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7l9 6 9-6" />
+              </svg>
+            </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Check your email</h2>
             <p className="text-gray-500 text-sm">
               We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click it to
@@ -101,7 +110,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 text-white py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full cursor-pointer rounded-lg bg-blue-600 text-white py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Creating account…" : "Create account"}
           </button>

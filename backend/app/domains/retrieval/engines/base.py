@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.schemas import RetrievalFilters, RetrievedChunk
 
 
@@ -17,5 +18,6 @@ class RetrievalEngine(ABC):
         top_k: int,
         filters: RetrievalFilters | None = None,
         embedding_model: str = "text-embedding-3-small",
+        scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
         raise NotImplementedError

@@ -6,6 +6,7 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.domains.retrieval.access import AccessScope, visible_document_clause
 from app.domains.retrieval.engines.base import RetrievalEngine
 from app.domains.retrieval.filters import apply_common_filters
 from app.domains.retrieval.mapping import row_to_retrieved_chunk
@@ -54,8 +55,9 @@ class TreeRetrievalEngine(RetrievalEngine):
         top_k: int,
         filters: RetrievalFilters | None = None,
         embedding_model: str = "text-embedding-3-small",
+        scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
-        trees = await load_document_trees(db, org_id, kb_ids, filters)
+        trees = await load_document_trees(db, org_id, kb_ids, filters, scope)
         if not trees:
             return []
 
@@ -64,7 +66,7 @@ class TreeRetrievalEngine(RetrievalEngine):
             return []
 
         return await fetch_node_chunks(
-            db, org_id, kb_ids, filters, trees, selected, top_k, "tree"
+            db, org_id, kb_ids, filters, trees, selected, top_k, "tree", scope
         )
 
     async def _select_nodes(
@@ -108,12 +110,15 @@ async def load_document_trees(
     org_id: uuid.UUID,
     kb_ids: list[uuid.UUID],
     filters: RetrievalFilters | None,
+    scope: AccessScope | None = None,
 ) -> dict[str, tuple[Document, list[TreeNode]]]:
     """Org-scoped load of document outlines, keyed by short refs ('d1', 'd2')
     so an LLM never handles real document ids."""
     stmt = (
         select(Document)
         .where(Document.organization_id == org_id, Document.knowledge_base_id.in_(kb_ids))
+        # Outlines are shown to an LLM: restricted documents' headings must never reach it.
+        .where(visible_document_clause(scope))
         .limit(MAX_OUTLINE_DOCS * 3)
     )
     if not (filters and filters.include_superseded):
@@ -140,6 +145,7 @@ async def fetch_node_chunks(
     selected: list[tuple[str, TreeNode]],
     limit: int,
     method: str,
+    scope: AccessScope | None = None,
 ) -> list[RetrievedChunk]:
     """Loads the real source chunks under the selected tree nodes. Filters
     (org, KB, freshness, authority) are re-applied here, so they hold no
@@ -160,7 +166,7 @@ async def fetch_node_chunks(
             tuple_(Chunk.document_id, Chunk.chunk_index).in_(wanted),
         )
     )
-    stmt = apply_common_filters(stmt, filters)
+    stmt = apply_common_filters(stmt, filters, scope)
     stmt = stmt.order_by(Chunk.document_id, Chunk.chunk_index).limit(limit)
     rows = (await db.execute(stmt)).all()
     return [row_to_retrieved_chunk(c, d, TREE_BASE_SCORE, method) for c, d in rows]

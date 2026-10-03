@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.domains.organizations.schemas import OrgCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
 from app.models.organization import Organization
-from app.models.organization_member import OrgRole, OrganizationMember
+from app.models.organization_member import OrganizationMember, OrgRole
 
 logger = structlog.get_logger()
 
@@ -67,15 +67,38 @@ class OrganizationService:
         self,
         db: AsyncSession,
         user_id: uuid.UUID,
-    ) -> list[Organization]:
+    ) -> list[tuple[Organization, OrgRole, int]]:
+        """The caller's organizations with their role in each and the member count."""
+        my_orgs = select(OrganizationMember.organization_id).where(
+            OrganizationMember.user_id == user_id
+        )
+        counts = (
+            select(
+                OrganizationMember.organization_id.label("org_id"),
+                func.count().label("n"),
+            )
+            .where(OrganizationMember.organization_id.in_(my_orgs))
+            .group_by(OrganizationMember.organization_id)
+            .subquery()
+        )
         stmt = (
-            select(Organization)
+            select(Organization, OrganizationMember.role, counts.c.n)
             .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+            .join(counts, counts.c.org_id == Organization.id)
             .where(OrganizationMember.user_id == user_id)
             .order_by(Organization.created_at.desc())
         )
         result = await db.execute(stmt)
-        return list(result.scalars().all())
+        return [(org, role, n) for org, role, n in result.all()]
+
+    async def member_role(
+        self, db: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID
+    ) -> OrgRole | None:
+        stmt = select(OrganizationMember.role).where(
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.user_id == user_id,
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
 
     async def update(
         self,

@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.domains.rag.claim_verifier import VerificationOutcome
 from app.domains.rag.schemas import RAGRequest
 from app.domains.rag.service import RAGService
 from app.domains.retrieval.schemas import RetrievalResult, RetrievedChunk
@@ -40,7 +41,8 @@ async def test_injected_document_content_stays_confined_to_evidence_block():
 
     class FakeLLM:
         async def generate(self, messages, temperature=0.1, max_tokens=2048):
-            captured_messages["messages"] = messages
+            # First call is the answer generation; later calls are verifier/conflict checks.
+            captured_messages.setdefault("messages", messages)
             return LLMResponse(
                 content="Based on [Source 1], the refund window is 30 days.",
                 prompt_tokens=50,
@@ -66,8 +68,8 @@ async def test_injected_document_content_stays_confined_to_evidence_block():
     ), patch(
         "app.domains.rag.service.get_llm_provider", return_value=FakeLLM()
     ), patch(
-        "app.domains.rag.claim_verifier.claim_verifier.verify_claims",
-        new=AsyncMock(return_value=[]),
+        "app.domains.rag.claim_verifier.claim_verifier.verify",
+        new=AsyncMock(return_value=VerificationOutcome(status="verified")),
     ):
         response = await service.query(
             db=AsyncMock(),

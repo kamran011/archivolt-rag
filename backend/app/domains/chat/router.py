@@ -1,11 +1,13 @@
 import json
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, get_db
+from app.core.rate_limit import enforce_budget, rate_limit
 from app.domains.auth.dependencies import require_org
 from app.domains.auth.schemas import CurrentUser
 from app.domains.chat.schemas import (
@@ -15,43 +17,73 @@ from app.domains.chat.schemas import (
     MessageResponse,
 )
 from app.domains.chat.service import chat_service
-from app.domains.rag.schemas import RAGResponse
+from app.domains.retrieval.access import AccessScope, Actor, actor_for, scope_for
 
+logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.post("/")
+@router.post(
+    "/",
+    dependencies=[
+        Depends(rate_limit("chat", "RATE_LIMIT_CHAT_PER_MIN")),
+        Depends(enforce_budget),
+    ],
+)
 async def send_message(
     request: ChatRequest,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if request.stream:
         return StreamingResponse(
-            _stream_response(current_user.organization_id, current_user.id, request),
+            _stream_response(
+                current_user.organization_id,
+                current_user.id,
+                request,
+                scope_for(current_user),
+                actor_for(current_user),
+            ),
             media_type="text/event-stream",
         )
 
     return await chat_service.send_message(
-        db, current_user.organization_id, current_user.id, request
+        db,
+        current_user.organization_id,
+        current_user.id,
+        request,
+        scope_for(current_user),
+        actor_for(current_user),
     )
 
 
-async def _stream_response(org_id: uuid.UUID, user_id: uuid.UUID, request: ChatRequest):
+async def _stream_response(
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    request: ChatRequest,
+    scope: AccessScope,
+    actor: Actor,
+):
     """Runs on its own DB session so the connection outlives the route handler's return."""
     async with AsyncSessionLocal() as db:
         try:
-            async for event in chat_service.send_message_stream(db, org_id, user_id, request):
+            async for event in chat_service.send_message_stream(
+                db, org_id, user_id, request, scope, actor
+            ):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             await db.rollback()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Log the detail server-side; never send exception text (DB/provider
+            # internals) to the client.
+            logger.error("chat_stream_failed", error=str(e), org_id=str(org_id))
+            message = "Something went wrong while generating the answer. Please try again."
+            yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
 
 
 @router.get("/conversations", response_model=list[ConversationResponse])
 async def list_conversations(
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     convs = await chat_service.list_conversations(
         db, current_user.organization_id, current_user.id
@@ -63,10 +95,14 @@ async def list_conversations(
 async def get_conversation(
     conv_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    conv = await chat_service.get_conversation(db, current_user.organization_id, conv_id)
-    messages = await chat_service.get_messages(db, current_user.organization_id, conv_id)
+    conv = await chat_service.get_conversation(
+        db, current_user.organization_id, conv_id, current_user.id
+    )
+    messages = await chat_service.get_messages(
+        db, current_user.organization_id, conv_id, current_user.id
+    )
     return ConversationDetailResponse(
         id=conv.id,
         knowledge_base_id=conv.knowledge_base_id,
@@ -81,6 +117,8 @@ async def get_conversation(
 async def delete_conversation(
     conv_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    await chat_service.delete_conversation(db, current_user.organization_id, conv_id)
+    await chat_service.delete_conversation(
+        db, current_user.organization_id, conv_id, current_user.id
+    )

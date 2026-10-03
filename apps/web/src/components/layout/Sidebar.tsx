@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -50,6 +51,24 @@ const navItems = [
     ),
   },
   {
+    label: "Evaluation Lab",
+    href: "/dashboard/evals",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    label: "Architecture",
+    href: "/dashboard/architecture",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+      </svg>
+    ),
+  },
+  {
     label: "Settings",
     href: "/dashboard/settings",
     icon: (
@@ -61,37 +80,81 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
 
-  return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-      <div className="px-4 py-5 border-b border-gray-100">
-        <span className="text-lg font-bold text-gray-900">Archivolt</span>
-      </div>
+  // Close the mobile drawer whenever navigation happens.
+  useEffect(() => {
+    onClose?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {navItems.map((item) => {
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                active
-                  ? "bg-blue-50 text-blue-700 font-medium"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+  return (
+    <>
+      {open && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={onClose}
+          className="fixed inset-0 z-30 cursor-default bg-black/30 lg:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-gray-100">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="shrink-0">
+            <circle cx="14" cy="14" r="5" stroke="var(--primary)" strokeWidth="2.2" />
+            <circle cx="14" cy="14" r="9.5" stroke="var(--primary)" strokeWidth="2" opacity="0.55" />
+            <circle cx="14" cy="14" r="13" stroke="var(--primary)" strokeWidth="1.6" opacity="0.3" />
+          </svg>
+          <span className="text-lg font-bold text-gray-900 tracking-tight flex-1">Archivolt</span>
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={onClose}
+            className="cursor-pointer rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700 lg:hidden"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {navItems.map((item) => {
+            const active =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
+                  active
+                    ? "text-primary font-semibold"
+                    : "text-gray-500 font-medium hover:bg-gray-50 hover:text-gray-800"
+                }`}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-primary" />
+                )}
+                <span className={active ? "text-primary" : ""}>{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }

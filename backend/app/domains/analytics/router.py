@@ -14,7 +14,7 @@ router = APIRouter()
 async def usage(
     days: int = Query(default=30, ge=1, le=365),
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Org-wide usage, abstention and cost figures. Admin/owner only because it
     exposes spend across all members."""

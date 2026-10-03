@@ -1,17 +1,29 @@
+import builtins
 import uuid
 from datetime import UTC, datetime
 
 import structlog
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.domains.documents.schemas import DocumentUpdate
 from app.domains.documents.storage import storage_service
+from app.domains.documents.upload_safety import read_limited, sanitize_filename, sniff_content
 from app.domains.knowledge_bases.service import kb_service
-from app.models.document import AuthorityTier, Document, DocumentStatus, FileType
+from app.domains.retrieval.access import AccessScope, visible_document_clause
+from app.models.chunk import Chunk
+from app.models.document import (
+    AuthorityTier,
+    Document,
+    DocumentAccess,
+    DocumentStatus,
+    FileType,
+)
+from app.models.organization_member import OrganizationMember
+from app.models.summary import DocumentSummary
 
 logger = structlog.get_logger()
 
@@ -25,6 +37,10 @@ ALLOWED_EXTENSIONS: dict[str, FileType] = {
     ".htm": FileType.html,
     ".csv": FileType.csv,
     ".json": FileType.json,
+    ".png": FileType.image,
+    ".jpg": FileType.image,
+    ".jpeg": FileType.image,
+    ".webp": FileType.image,
 }
 
 
@@ -49,6 +65,8 @@ class DocumentService:
         file: UploadFile,
         uploaded_by: uuid.UUID | None = None,
         authority_tier: AuthorityTier = AuthorityTier.standard,
+        restricted: bool = False,
+        tags: builtins.list[str] | None = None,
     ) -> Document:
         # Verify KB exists and belongs to org
         await kb_service.get(db, org_id, kb_id)
@@ -62,6 +80,8 @@ class DocumentService:
             version=1,
             supersedes_document_id=None,
             authority_tier=authority_tier,
+            restricted=restricted,
+            tags=tags,
         )
 
         await kb_service.increment_document_count(db, kb_id, delta=1)
@@ -75,12 +95,14 @@ class DocumentService:
         file: UploadFile,
         uploaded_by: uuid.UUID | None = None,
         effective_date: datetime | None = None,
+        *,
+        scope: AccessScope,
     ) -> Document:
         """Uploads a new version of an existing document. The prior version is
         marked superseded and excluded from retrieval by default (freshness),
         but remains queryable for historical questions via
         RetrievalFilters.include_superseded."""
-        previous = await self.get(db, org_id, doc_id)
+        previous = await self.get(db, org_id, doc_id, scope=scope)
 
         new_document = await self._store_and_create(
             db,
@@ -93,6 +115,16 @@ class DocumentService:
             authority_tier=previous.authority_tier,
             effective_date=effective_date,
         )
+        # A new version must not become more visible than the one it replaces.
+        new_document.tags = list(previous.tags or [])
+        new_document.restricted = previous.restricted
+        grants = await db.execute(
+            select(DocumentAccess.user_id).where(DocumentAccess.document_id == previous.id)
+        )
+        for (grantee,) in grants.all():
+            db.add(
+                DocumentAccess(organization_id=org_id, document_id=new_document.id, user_id=grantee)
+            )
 
         previous.is_current = False
         previous.superseded_at = datetime.now(UTC)
@@ -113,9 +145,13 @@ class DocumentService:
         db: AsyncSession,
         org_id: uuid.UUID,
         doc_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[Document]:
-        """Returns the full version chain (oldest to newest) for the document family."""
-        anchor = await self.get(db, org_id, doc_id)
+        """Returns the full version chain (oldest to newest) for the document family.
+        Versions share their access settings (see create_new_version), so checking the
+        anchor covers the chain."""
+        anchor = await self.get(db, org_id, doc_id, scope=scope)
 
         # Walk backward to find the root of the version chain
         root_id = anchor.id
@@ -144,8 +180,14 @@ class DocumentService:
         org_id: uuid.UUID,
         doc_id: uuid.UUID,
         data: DocumentUpdate,
+        *,
+        scope: AccessScope,
     ) -> Document:
-        doc = await self.get(db, org_id, doc_id)
+        doc = await self.get(db, org_id, doc_id, scope=scope)
+        if data.tags is not None:
+            doc.tags = sorted({t.strip() for t in data.tags if t.strip()})
+        if data.restricted is not None:
+            doc.restricted = data.restricted
         if data.authority_tier is not None:
             doc.authority_tier = data.authority_tier
         if data.effective_date is not None:
@@ -164,20 +206,21 @@ class DocumentService:
         supersedes_document_id: uuid.UUID | None,
         authority_tier: AuthorityTier,
         effective_date: datetime | None = None,
+        restricted: bool = False,
+        tags: builtins.list[str] | None = None,
     ) -> Document:
         file_type = self._validate_upload(file)
+        safe_name = sanitize_filename(file.filename)
 
-        content = await file.read()
-        max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-        if len(content) > max_bytes:
-            raise ValidationError(
-                f"File exceeds maximum size of {settings.MAX_UPLOAD_SIZE_MB}MB"
-            )
+        content = await read_limited(
+            file, settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024, settings.MAX_UPLOAD_SIZE_MB
+        )
         if len(content) == 0:
             raise ValidationError("File is empty")
+        sniff_content(content, file_type)
 
         doc_id = uuid.uuid4()
-        storage_path = storage_service.build_path(org_id, kb_id, doc_id, file.filename)
+        storage_path = storage_service.build_path(org_id, kb_id, doc_id, safe_name)
 
         await storage_service.upload_file(
             storage_path, content, file.content_type or "application/octet-stream"
@@ -187,8 +230,8 @@ class DocumentService:
             id=doc_id,
             organization_id=org_id,
             knowledge_base_id=kb_id,
-            title=file.filename.rsplit(".", 1)[0],
-            file_name=file.filename,
+            title=safe_name.rsplit(".", 1)[0],
+            file_name=safe_name,
             file_type=file_type,
             file_size=len(content),
             storage_path=storage_path,
@@ -199,6 +242,8 @@ class DocumentService:
             supersedes_document_id=supersedes_document_id,
             authority_tier=authority_tier,
             effective_date=effective_date,
+            restricted=restricted,
+            tags=sorted({t.strip() for t in (tags or []) if t.strip()}),
         )
         db.add(document)
         await db.flush()
@@ -218,10 +263,16 @@ class DocumentService:
         db: AsyncSession,
         org_id: uuid.UUID,
         doc_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> Document:
+        """Org-scoped fetch that also enforces document-level access. `scope` is required
+        so a caller cannot forget it; internal callers pass SYSTEM_SCOPE explicitly. A
+        restricted document the scope cannot see looks like it does not exist."""
         stmt = select(Document).where(
             Document.id == doc_id,
             Document.organization_id == org_id,
+            visible_document_clause(scope),
         )
         result = await db.execute(stmt)
         doc = result.scalar_one_or_none()
@@ -234,12 +285,15 @@ class DocumentService:
         db: AsyncSession,
         org_id: uuid.UUID,
         kb_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[Document]:
         stmt = (
             select(Document)
             .where(
                 Document.organization_id == org_id,
                 Document.knowledge_base_id == kb_id,
+                visible_document_clause(scope),
             )
             .order_by(Document.created_at.desc())
         )
@@ -251,12 +305,67 @@ class DocumentService:
         db: AsyncSession,
         org_id: uuid.UUID,
         doc_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> None:
-        doc = await self.get(db, org_id, doc_id)
+        doc = await self.get(db, org_id, doc_id, scope=scope)
         await storage_service.delete_file(doc.storage_path)
         await db.delete(doc)  # cascades to chunks
         await kb_service.increment_document_count(db, doc.knowledge_base_id, delta=-1)
         await db.flush()
+
+    async def list_chunks(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        limit: int,
+        offset: int,
+        *,
+        scope: AccessScope,
+    ) -> tuple[int, builtins.list[dict]]:  # `list` is shadowed by the method above
+        """Chunks of a document (org-scoped), without loading the embedding vectors."""
+        await self.get(db, org_id, doc_id, scope=scope)
+        base = (Chunk.document_id == doc_id, Chunk.organization_id == org_id)
+        total = (
+            await db.execute(select(func.count()).select_from(Chunk).where(*base))
+        ).scalar_one()
+        rows = await db.execute(
+            select(
+                Chunk.id,
+                Chunk.chunk_index,
+                Chunk.token_count,
+                Chunk.content,
+                Chunk.metadata_,
+                Chunk.embedding.is_not(None).label("has_embedding"),
+            )
+            .where(*base)
+            .order_by(Chunk.chunk_index)
+            .limit(limit)
+            .offset(offset)
+        )
+        return total, [
+            {
+                "id": r.id,
+                "chunk_index": r.chunk_index,
+                "token_count": r.token_count,
+                "content": r.content,
+                "metadata": r.metadata_,
+                "has_embedding": r.has_embedding,
+            }
+            for r in rows
+        ]
+
+    async def list_summaries(
+        self, db: AsyncSession, org_id: uuid.UUID, doc_id: uuid.UUID, *, scope: AccessScope
+    ) -> builtins.list[DocumentSummary]:
+        await self.get(db, org_id, doc_id, scope=scope)
+        rows = await db.execute(
+            select(DocumentSummary)
+            .where(DocumentSummary.document_id == doc_id, DocumentSummary.organization_id == org_id)
+            .order_by(DocumentSummary.level.desc(), DocumentSummary.node_id)
+        )
+        return list(rows.scalars().all())
 
     async def get_signed_url(
         self,
@@ -264,8 +373,10 @@ class DocumentService:
         org_id: uuid.UUID,
         doc_id: uuid.UUID,
         expires_in: int = 3600,
+        *,
+        scope: AccessScope,
     ) -> str:
-        doc = await self.get(db, org_id, doc_id)
+        doc = await self.get(db, org_id, doc_id, scope=scope)
         return await storage_service.get_signed_url(doc.storage_path, expires_in)
 
     async def update_status(
@@ -281,6 +392,67 @@ class DocumentService:
             if error_message is not None:
                 doc.error_message = error_message
             await db.flush()
+
+
+
+    # --- document-level access grants (managed by owners/admins) ---------------------
+
+    async def list_access(
+        self, db: AsyncSession, org_id: uuid.UUID, doc_id: uuid.UUID, *, scope: AccessScope
+    ) -> builtins.list[uuid.UUID]:
+        await self.get(db, org_id, doc_id, scope=scope)
+        rows = await db.execute(
+            select(DocumentAccess.user_id).where(
+                DocumentAccess.document_id == doc_id, DocumentAccess.organization_id == org_id
+            )
+        )
+        return [r[0] for r in rows.all()]
+
+    async def grant_access(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        user_id: uuid.UUID,
+        *,
+        scope: AccessScope,
+    ) -> None:
+        await self.get(db, org_id, doc_id, scope=scope)
+        member = await db.execute(
+            select(OrganizationMember.id).where(
+                OrganizationMember.organization_id == org_id,
+                OrganizationMember.user_id == user_id,
+            )
+        )
+        if member.first() is None:
+            # Grants only make sense inside the org; also avoids probing other orgs' users.
+            raise ValidationError("User is not a member of this organization")
+        existing = await db.execute(
+            select(DocumentAccess.id).where(
+                DocumentAccess.document_id == doc_id, DocumentAccess.user_id == user_id
+            )
+        )
+        if existing.first() is None:
+            db.add(DocumentAccess(organization_id=org_id, document_id=doc_id, user_id=user_id))
+            await db.flush()
+
+    async def revoke_access(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        user_id: uuid.UUID,
+        *,
+        scope: AccessScope,
+    ) -> None:
+        await self.get(db, org_id, doc_id, scope=scope)
+        await db.execute(
+            delete(DocumentAccess).where(
+                DocumentAccess.document_id == doc_id,
+                DocumentAccess.organization_id == org_id,
+                DocumentAccess.user_id == user_id,
+            )
+        )
 
 
 document_service = DocumentService()

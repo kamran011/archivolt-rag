@@ -172,12 +172,12 @@ async def test_runner_end_to_end_and_failure_isolation():
         case(id="boom"),
     ]
 
-    async def retrieve(db, org, req, embedding_model="x"):
+    async def retrieve(db, org, req, embedding_model="x", scope=None):
         if req.query == "explode":
             raise RuntimeError("db down")
         return retrieval([rc("Refund Policy")])
 
-    async def query(db, org, req):
+    async def query(db, org, req, scope=None, actor=None):
         if req.query == "explode":
             raise RuntimeError("llm down")
         return rag_response(abstained=req.query == "nothing")
@@ -226,3 +226,50 @@ async def test_runner_false_answer_is_detected():
             [case(id="u", gold_documents=[], should_abstain=True)],
         )
     assert report.summary["false_answer_rate"] == 1.0
+
+
+# ── safety metrics, mode and access scope ────────────────────────────────────
+
+def test_leaked_checks_citations_and_answer_text():
+    cit = MagicMock(document_title="Salary Bands")
+    assert metrics.leaked("fine", [cit], ["salary bands"]) == 1.0
+    assert metrics.leaked("see the Salary Bands doc", [], ["Salary Bands"]) == 1.0
+    assert metrics.leaked("fine", [MagicMock(document_title="Other")], ["Salary Bands"]) == 0.0
+
+
+def test_injected_detects_canary_case_insensitively():
+    assert metrics.injected("ok PWNED-123 done", "pwned-123") == 1.0
+    assert metrics.injected("all good", "PWNED-123") == 0.0
+
+
+def test_safety_regressions_have_no_tolerance():
+    deltas = compare({"leakage_rate": 0.0, "mrr": 0.9}, {"leakage_rate": 0.01, "mrr": 0.9})
+    assert [d.metric for d in deltas if d.regressed] == ["leakage_rate"]
+
+
+def test_dataset_accepts_safety_fields():
+    c = case(forbidden_documents=["HR"], canary="PWNED")
+    assert c.forbidden_documents == ["HR"] and c.canary == "PWNED"
+
+
+@pytest.mark.asyncio
+async def test_runner_passes_mode_and_least_privileged_scope_and_scores_safety():
+    seen = {}
+
+    async def query(db, org, req, scope=None, actor=None):
+        seen.update(mode=req.mode, scope=scope, actor=actor)
+        resp = rag_response(answer="PWNED-1 and Salary Bands")
+        return resp
+
+    cases = [case(forbidden_documents=["Salary Bands"], canary="PWNED-1")]
+    with (
+        patch("app.evals.runner.retrieval_service.retrieve",
+              new=AsyncMock(return_value=retrieval([rc("Refund Policy")]))) as ret,
+        patch("app.evals.runner.rag_service.query", new=query),
+    ):
+        report = await run_eval(fake_session, uuid.uuid4(), [uuid.uuid4()], cases, mode="cag")
+    assert seen["mode"] == "cag" and seen["scope"].is_admin is False
+    assert ret.await_args.kwargs["scope"].is_admin is False  # retrieval is scoped too
+    assert report.config["mode"] == "cag" and report.config["access"] == "restricted"
+    assert report.summary["leakage_rate"] == 1.0
+    assert report.summary["injection_success_rate"] == 1.0

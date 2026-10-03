@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function DashboardPage() {
   return (
     <div>
@@ -27,9 +29,9 @@ export default function DashboardPage() {
         <h2 className="font-medium text-blue-900 mb-1">Get started</h2>
         <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
           <li>
-            <a href="/dashboard/knowledge-bases/new" className="underline">
+            <Link href="/dashboard/knowledge-bases/new" className="underline">
               Create a knowledge base
-            </a>
+            </Link>
           </li>
           <li>Upload documents (PDF, DOCX, Markdown, TXT)</li>
           <li>

@@ -3,7 +3,10 @@ import CitationChip from "@/components/chat/CitationChip";
 import AbstentionMessage from "@/components/chat/AbstentionMessage";
 import ChatAvatar from "@/components/chat/ChatAvatar";
 
-function renderContentWithCitations(message: ChatMessage) {
+function renderContentWithCitations(
+  message: ChatMessage,
+  onCitationOpen?: (index: number) => void
+) {
   const { content, citations } = message;
   if (!citations || citations.length === 0) return content;
 
@@ -17,7 +20,13 @@ function renderContentWithCitations(message: ChatMessage) {
     const idx = parseInt(match[1], 10);
     const citation = citations.find((c) => c.index === idx);
     if (citation) {
-      parts.push(<CitationChip key={`${message.id}-${match.index}`} citation={citation} />);
+      parts.push(
+        <CitationChip
+          key={`${message.id}-${match.index}`}
+          citation={citation}
+          onOpen={() => onCitationOpen?.(citation.index)}
+        />
+      );
     } else {
       parts.push(match[0]);
     }
@@ -49,14 +58,67 @@ function ConflictNotice({ message }: { message: ChatMessage }) {
   );
 }
 
-export default function MessageBubble({ message }: { message: ChatMessage }) {
+function VerificationNotice({ message }: { message: ChatMessage }) {
+  if (message.verificationStatus === "unverified") {
+    return (
+      <p className="mt-2 text-[11px] text-amber-700">
+        This answer could not be checked against the sources - please verify it.
+      </p>
+    );
+  }
+  if (message.verificationStatus === "partial") {
+    return (
+      <p className="mt-2 text-[11px] text-text-muted">
+        Some statements were removed because the sources did not support them.
+      </p>
+    );
+  }
+  return null;
+}
+
+function EvidenceLink({
+  selected,
+  onSelect,
+}: {
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
+  if (!onSelect) return null;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`mt-1 ml-1 cursor-pointer rounded px-1.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
+        selected ? "text-primary-dark" : "text-text-muted hover:text-primary-dark"
+      }`}
+    >
+      {selected ? "Showing evidence" : "View evidence"}
+    </button>
+  );
+}
+
+export default function MessageBubble({
+  message,
+  selected,
+  onSelect,
+  onCitationOpen,
+}: {
+  message: ChatMessage;
+  selected?: boolean;
+  onSelect?: () => void;
+  onCitationOpen?: (index: number) => void;
+}) {
   const isUser = message.role === "user";
 
   if (message.abstained) {
     return (
       <div className="flex items-start gap-2.5">
         <ChatAvatar size={32} />
-        <AbstentionMessage content={message.content} />
+        <div>
+          <AbstentionMessage content={message.content} />
+          <EvidenceLink selected={selected} onSelect={onSelect} />
+        </div>
       </div>
     );
   }
@@ -64,7 +126,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
+        <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
           {message.content}
         </div>
       </div>
@@ -74,9 +136,15 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className="flex items-start gap-2.5">
       <ChatAvatar size={32} />
-      <div className="max-w-[75%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm whitespace-pre-wrap bg-bg text-text">
-        {renderContentWithCitations(message)}
+      <div className="max-w-[75%]">
+      <div
+        className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-gray-100 text-text ${
+          selected ? "ring-2 ring-primary/40" : ""
+        }`}
+      >
+        {renderContentWithCitations(message, onCitationOpen)}
         <ConflictNotice message={message} />
+        <VerificationNotice message={message} />
         {message.agent && (
           <p className="mt-2 text-[11px] text-text-muted">
             Deep research: {message.agent.steps.filter((s) => s.action !== "finish").length}{" "}
@@ -90,6 +158,8 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
             <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
           </span>
         )}
+      </div>
+      {!message.streaming && <EvidenceLink selected={selected} onSelect={onSelect} />}
       </div>
     </div>
   );

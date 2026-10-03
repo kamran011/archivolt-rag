@@ -28,6 +28,11 @@ def portable_jsonb() -> JSON:
 
 
 class TimestampMixin:
+    # updated_at is refreshed by the database (onupdate=func.now()). Without this the
+    # attribute is expired after an UPDATE flush and serializing the object in async code
+    # fails (500 on every PATCH endpoint). eager_defaults fetches it via RETURNING.
+    __mapper_args__ = {"eager_defaults": True}
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

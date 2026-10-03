@@ -1,7 +1,10 @@
 import uuid
+from enum import Enum
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.config import settings
 from app.domains.retrieval.evidence_gate import EvidenceGateResult
 
 
@@ -9,9 +12,13 @@ class RAGRequest(BaseModel):
     query: str
     knowledge_base_ids: list[uuid.UUID]
     conversation_history: list[dict] | None = None
-    model: str = "gpt-4o"
+    model: str = Field(default_factory=lambda: settings.DEFAULT_LLM_MODEL)
     temperature: float = 0.1
     agentic: bool = False
+    web_search: bool = False  # the user asked to allow external web results
+    # rag: retrieve passages. cag: answer from the whole (small) KB. hybrid: RAG first, then
+    # CAG if RAG's evidence is insufficient. CAG needs the KB to opt in and fit the budget.
+    mode: Literal["rag", "cag", "hybrid"] = "rag"
 
 
 class Citation(BaseModel):
@@ -22,6 +29,30 @@ class Citation(BaseModel):
     content: str
     page_number: int | None = None
     relevance_score: float
+    # 'internal' (the knowledge base) or 'external' (public web); url only for external.
+    source_type: str = "internal"
+    url: str | None = None
+
+
+class AbstentionReason(str, Enum):
+    """Why the system declined to answer. Abstaining is a valid outcome."""
+
+    insufficient_evidence = "insufficient_evidence"
+    conflicting_sources = "conflicting_sources"
+    verification_failed = "verification_failed"
+    # Reserved: not produced today because retrieval is tenant-scoped up front
+    # (unauthorized), superseded docs are filtered out (outdated), and there is
+    # no question-type classifier yet (unsupported_question).
+    unauthorized = "unauthorized"
+    outdated = "outdated"
+    unsupported_question = "unsupported_question"
+
+
+ClaimStatus = Literal["supported", "partial", "unsupported"]
+
+# verified: every claim supported. partial: some unsupported claims were removed.
+# unsupported: nothing was supported. unverified: the verifier itself failed.
+VerificationStatus = Literal["verified", "partial", "unsupported", "unverified", "skipped"]
 
 
 class ClaimVerification(BaseModel):
@@ -29,6 +60,7 @@ class ClaimVerification(BaseModel):
     supported: bool
     supporting_sources: list[int]
     confidence: float
+    status: ClaimStatus = "supported"
 
 
 class ConflictInfo(BaseModel):
@@ -49,4 +81,8 @@ class RAGResponse(BaseModel):
     conflicts: list[ConflictInfo] = []
     evidence_gate: EvidenceGateResult
     abstained: bool
+    abstention_reason: AbstentionReason | None = None
+    verification_status: VerificationStatus = "skipped"
     retrieval_metadata: dict
+    # Internal: persisted to rag_traces by the chat layer, never sent to clients.
+    trace_stages: dict = Field(default_factory=dict, exclude=True)

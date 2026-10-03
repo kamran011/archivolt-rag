@@ -22,6 +22,9 @@ class ParsedDocument(BaseModel):
     title: str
     pages: list[ParsedPage]
     metadata: dict = Field(default_factory=dict)
+    # Typed rows of a tabular document (CSV / JSON record list), stored for structured
+    # queries. Separate from `metadata`, which is persisted as-is on the document.
+    records: list[dict] = Field(default_factory=list)
 
     def all_elements(self) -> list[DocumentElement]:
         elements: list[DocumentElement] = []
@@ -42,3 +45,6 @@ class IngestionStatusResponse(BaseModel):
     status: str
     progress_message: str | None = None
     error_message: str | None = None
+    job_status: str | None = None  # queued | running | succeeded | failed | dead
+    attempts: int | None = None
+    max_attempts: int | None = None

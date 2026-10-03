@@ -1,12 +1,10 @@
-import asyncio
 import time
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.core.tracing import RetrievalTrace, Span
-
 
 # ── Unit tests for RetrievalTrace ─────────────────────────────────────────────
 

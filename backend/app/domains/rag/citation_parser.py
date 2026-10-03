@@ -1,6 +1,7 @@
 import re
 
 from app.domains.rag.schemas import Citation
+from app.domains.retrieval.evidence import is_external
 from app.domains.retrieval.schemas import RetrievedChunk
 
 SOURCE_REF_RE = re.compile(r"\[Source (\d+)\]")
@@ -30,6 +31,8 @@ class CitationParser:
                         content=chunk.content,
                         page_number=chunk.metadata.get("page_number"),
                         relevance_score=chunk.score,
+                        source_type="external" if is_external(chunk) else "internal",
+                        url=chunk.metadata.get("url") if is_external(chunk) else None,
                     )
                 )
         return citations

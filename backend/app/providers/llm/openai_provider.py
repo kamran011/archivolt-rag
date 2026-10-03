@@ -3,14 +3,17 @@ from collections.abc import AsyncIterator
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.core.exceptions import ProviderError
+from app.core.exceptions import provider_error
 from app.providers.llm.base import LLMProvider, LLMResponse
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, model: str = "gpt-4o") -> None:
-        self.model = model
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    def __init__(self, model: str | None = None) -> None:
+        self.model = model or settings.DEFAULT_LLM_MODEL
+        self._client = AsyncOpenAI(
+            api_key=settings.LLM_API_KEY or settings.OPENAI_API_KEY,
+            base_url=settings.LLM_BASE_URL,
+        )
 
     async def generate(
         self,
@@ -26,7 +29,7 @@ class OpenAIProvider(LLMProvider):
                 max_tokens=max_tokens,
             )
         except Exception as e:
-            raise ProviderError(f"OpenAI generation failed: {e}")
+            raise provider_error("OpenAI", "generation", e) from e
 
         choice = response.choices[0]
         return LLMResponse(
@@ -55,4 +58,4 @@ class OpenAIProvider(LLMProvider):
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
-            raise ProviderError(f"OpenAI streaming failed: {e}")
+            raise provider_error("OpenAI", "streaming", e) from e

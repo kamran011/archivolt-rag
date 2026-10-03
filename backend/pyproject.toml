@@ -43,6 +43,14 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI Depends()/Query() in defaults is the framework idiom.
+# UP042: (str, Enum) kept for py3.11 JSON/DB compatibility.
+# E501: long lines are mostly prompt text and regexes; length is left to the formatter.
+ignore = ["B008", "UP042", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Routers are imported after `app` is created to avoid circular imports.
+"app/main.py" = ["E402"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

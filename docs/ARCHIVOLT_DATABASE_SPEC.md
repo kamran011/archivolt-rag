@@ -1,9 +1,16 @@
 # Archivolt Database Specification
 
-> **Status: PENDING**
-> This document will contain the authoritative database schema for Archivolt.
-> The application models in `backend/app/models/` are interface stubs that will be aligned with this spec.
-> Supabase migrations in `supabase/migrations/` will implement this schema.
+> **Status: DERIVED (interim)**
+> No authoritative spec has been supplied yet. The schema in
+> `supabase/migrations/20260929000000_initial_schema.sql` was derived from the
+> SQLAlchemy models in `backend/app/models/`, and adds the search indexes, the
+> `fts_vector` trigger and read-only RLS policies. If an authoritative spec
+> differs, reconcile with a follow-up migration.
+>
+> Verified by applying the migration to the `supabase/postgres:15.8.1.085`
+> image (pgvector, `auth.uid()`, `authenticated` role): the HNSW index is used
+> for cosine search, FTS matches via the trigger, and RLS hides other orgs'
+> rows and blocks direct writes. The full `supabase start` stack was not run.
 
 ## Overview
 

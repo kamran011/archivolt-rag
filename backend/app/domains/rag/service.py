@@ -1,7 +1,6 @@
-import time
 import uuid
-from dataclasses import dataclass
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 import structlog
 import tiktoken
@@ -11,25 +10,47 @@ from app.config import settings
 from app.core.tracing import RetrievalTrace
 from app.domains.agent.retrieval_agent import AgentResult, retrieval_agent
 from app.domains.rag.citation_parser import CitationParser
-from app.domains.rag.claim_verifier import claim_verifier
+from app.domains.rag.claim_verifier import VerificationOutcome, claim_verifier
 from app.domains.rag.conflict_detector import conflict_detector
 from app.domains.rag.conflict_resolver import ConflictResolver
-from app.domains.rag.prompts import ABSTENTION_TEMPLATE, build_context_prompt
-from app.domains.rag.schemas import ConflictInfo, RAGRequest, RAGResponse
-from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter
-from app.domains.retrieval.evidence_gate import EvidenceGate
-from app.domains.retrieval.expansion import expand_with_neighbors
+from app.domains.rag.prompts import (
+    ABSTENTION_TEMPLATE,
+    REWRITE_SUPPORTED_ONLY_PROMPT,
+    build_context_prompt,
+)
+from app.domains.rag.schemas import (
+    AbstentionReason,
+    ClaimVerification,
+    ConflictInfo,
+    RAGRequest,
+    RAGResponse,
+    VerificationStatus,
+)
+from app.domains.rag.stages import build_stages
+from app.domains.retrieval.access import AccessScope, Actor
+from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
+from app.domains.retrieval.cag import CagContext, load_cag_context
+from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, is_external
+from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
+from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
 from app.domains.retrieval.query_router import RouteDecision, query_router
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
 from app.domains.retrieval.service import retrieval_service
+from app.domains.retrieval.sufficiency import (
+    SufficiencyResult,
+    _covers,
+    evaluate_sufficiency,
+)
+from app.domains.tools.base import ToolContext, ToolExecutor
+from app.domains.tools.registry import default_registry
 from app.providers.cost import estimate_llm_cost
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.registry import get_llm_provider
-from app.providers.reranker.llm_reranker import LLMReranker
+from app.providers.reranker.registry import get_reranker
 
 logger = structlog.get_logger()
 
-_reranker = LLMReranker()
+_reranker = get_reranker()
 
 AGENTIC_MAX_CANDIDATES = 30
 
@@ -54,10 +75,25 @@ class _Retrieved:
 
 
 async def _retrieve_candidates(
-    db: AsyncSession, org_id: uuid.UUID, request: RAGRequest, route: RouteDecision
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    scope: AccessScope | None,
+    actor: Actor | None = None,
 ) -> _Retrieved:
     if request.agentic and settings.ENABLE_AGENTIC_RAG:
-        agent = await retrieval_agent.run(db, org_id, request.query, request.knowledge_base_ids)
+        agent = await retrieval_agent.run(
+            db,
+            org_id,
+            request.query,
+            request.knowledge_base_ids,
+            scope=scope,
+            user_id=actor.user_id if actor else None,
+            role=actor.role if actor else None,
+            org_settings=actor.org_settings if actor else None,
+            web_search=request.web_search,
+        )
         return _Retrieved(
             chunks=agent.chunks[:AGENTIC_MAX_CANDIDATES],
             retrieval_time_ms=agent.elapsed_ms,
@@ -73,8 +109,285 @@ async def _retrieve_candidates(
             strategy=route.strategy,
             top_k=20,
         ),
+        scope=scope,
     )
     return _Retrieved(result.chunks, result.retrieval_time_ms, result.strategy)
+
+
+@dataclass
+class _Evidence:
+    """Everything the retrieve -> rerank -> filter -> gates stages produced."""
+
+    retrieval: _Retrieved
+    candidates: list[RetrievedChunk]
+    reranked: list[RetrievedChunk]
+    after_score: list[RetrievedChunk]
+    filtered: list[RetrievedChunk]
+    filter_drops: list
+    gate: EvidenceGateResult
+    analysis: QueryAnalysis
+    sufficiency: SufficiencyResult
+    strategies_tried: list[str]
+    web_audit: list
+    mode_used: str = "rag"  # 'cag' when the answer context is the whole knowledge base
+    cag_note: str | None = None  # why CAG was requested but not used
+
+    @property
+    def passed(self) -> bool:
+        return self.gate.pass_gate and self.sufficiency.sufficient
+
+    @property
+    def abstention_reason(self) -> AbstentionReason:
+        if self.gate.pass_gate and self.sufficiency.failure_kind == "outdated":
+            return AbstentionReason.outdated
+        return AbstentionReason.insufficient_evidence
+
+    @property
+    def abstention_detail(self) -> str | None:
+        return self.gate.reason if not self.gate.pass_gate else self.sufficiency.reason
+
+
+def _expansion_ladder(first: str, request: RAGRequest) -> list[RouteDecision]:
+    """Strategies to try, in order, when the first attempt is insufficient. Never repeats a
+    strategy already tried, and never runs everything: capped by MAX_RETRIEVAL_EXPANSIONS."""
+    order: list[RouteDecision] = [RouteDecision(strategy="hybrid", reason="expand: hybrid")]
+    if settings.ENABLE_SECTION_SUMMARIES:  # summaries only exist when they are generated
+        order.append(RouteDecision(strategy="summary", reason="expand: hierarchical summaries"))
+    order.append(RouteDecision(strategy="tree", reason="expand: document tree"))
+    ladder = [r for r in order if r.strategy != first]
+    return ladder[: max(0, settings.MAX_RETRIEVAL_EXPANSIONS)]
+
+
+def _merge_candidates(
+    existing: list[RetrievedChunk], new: list[RetrievedChunk]
+) -> list[RetrievedChunk]:
+    seen = {c.chunk_id for c in existing}
+    return existing + [c for c in new if c.chunk_id not in seen]
+
+
+def _term_overlap(terms: list[str], text: str) -> float:
+    """Share of the question's key terms present in a chunk: a cheap, honest relevance signal
+    for CAG, where nothing is ranked or reranked."""
+    if not terms:
+        return 0.5
+    low = text.lower()
+    return sum(1 for t in terms if _covers(t, low)) / len(terms)
+
+
+def _cag_evidence(
+    request: RAGRequest, analysis: QueryAnalysis, cag: CagContext, web_audit: list
+) -> _Evidence:
+    chunks = [
+        c.model_copy(update={"score": round(_term_overlap(analysis.terms, c.content), 3)})
+        for c in cag.chunks
+    ]
+    # Best-first (stable: ties keep the loader's authority/title/position order), so the most
+    # relevant passage is Source 1, like in the ranked RAG path.
+    chunks.sort(key=lambda c: c.score, reverse=True)
+    top = max((c.score for c in chunks), default=0.0)
+    gate = EvidenceGateResult(
+        pass_gate=bool(chunks),
+        reason=None if chunks else "The knowledge base has no content",
+        confidence=top,
+        top_score=top,
+        chunk_count=len(chunks),
+    )
+    # No reranker vouches for relevance here, so only real term coverage counts
+    # (high_confidence above any possible score disables the "trust the reranker" override).
+    sufficiency = evaluate_sufficiency(analysis, chunks, high_confidence=2.0)
+    return _Evidence(
+        retrieval=_Retrieved(chunks=chunks, retrieval_time_ms=0.0, strategy="cag"),
+        candidates=chunks,
+        reranked=chunks,
+        after_score=chunks,
+        filtered=chunks,
+        filter_drops=[],
+        gate=gate,
+        analysis=analysis,
+        sufficiency=sufficiency,
+        strategies_tried=["cag"],
+        web_audit=web_audit,
+        mode_used="cag",
+    )
+
+
+async def _gather_evidence(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    trace: RetrievalTrace,
+    scope: AccessScope | None,
+    actor: Actor | None = None,
+) -> _Evidence:
+    """Answer-mode dispatcher. rag: the normal retrieval pipeline. cag: the whole (small,
+    opted-in) knowledge base as context, falling back to rag when ineligible. hybrid: rag
+    first, then cag if rag's evidence is insufficient."""
+    if request.mode == "rag":
+        return await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)
+
+    analysis = analyze_query(request.query)
+
+    async def try_cag() -> CagContext:
+        with trace.span("cag_load", mode=request.mode) as span:
+            cag = await load_cag_context(
+                db, org_id, request.knowledge_base_ids, scope, None
+            )
+            span.attributes.update(
+                eligible=cag.eligible, tokens=cag.total_tokens, reason=cag.reason
+            )
+        return cag
+
+    if request.mode == "cag":
+        cag = await try_cag()
+        if cag.eligible:
+            return _cag_evidence(request, analysis, cag, [])
+        ev = await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)
+        ev.cag_note = cag.reason
+        return ev
+
+    ev = await _gather_rag_evidence(db, org_id, request, route, trace, scope, actor)  # hybrid
+    if ev.passed:
+        return ev
+    cag = await try_cag()
+    if not cag.eligible:
+        ev.cag_note = cag.reason
+        return ev
+    cag_ev = _cag_evidence(request, analysis, cag, ev.web_audit)
+    if cag_ev.passed:
+        cag_ev.strategies_tried = [*ev.strategies_tried, "cag"]
+        return cag_ev
+    ev.cag_note = "CAG context did not cover the question either"
+    return ev
+
+
+async def _gather_rag_evidence(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    trace: RetrievalTrace,
+    scope: AccessScope | None,
+    actor: Actor | None = None,
+) -> _Evidence:
+    """Retrieve, rerank, filter and check the evidence; when the sufficiency gate says it
+    is not enough, widen retrieval with another strategy (bounded) before giving up.
+    Every candidate still comes from org-scoped queries, so expansion cannot widen access."""
+    analysis = analyze_query(request.query)
+    with trace.span(
+        "query_analysis",
+        intent=analysis.intent,
+        terms=analysis.terms,
+        requirements=[r.description for r in analysis.requirements],
+    ):
+        pass
+
+    with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
+        retrieval = await _retrieve_candidates(db, org_id, request, route, scope, actor)
+    candidates = list(retrieval.chunks)
+    tried = [retrieval.strategy]
+
+    ladder = _expansion_ladder(retrieval.strategy, request) if not request.agentic else []
+    web_executor = _web_fallback_executor(db, org_id, request, scope, actor)
+    web_pending = web_executor is not None
+    attempt = 0
+    while True:
+        with trace.span("rerank", candidates_in=len(candidates)):
+            reranked = await _reranker.rerank(request.query, candidates, top_k=10)
+        with trace.span("filter", candidates_in=len(reranked)):
+            after_score, outcome = EvidenceFilter.run_pipeline(
+                reranked, keep_superseded=analysis.wants_historical
+            )
+            filtered = outcome.kept
+        with trace.span("evidence_gate", candidates=len(filtered)):
+            gate = EvidenceGate.evaluate(request.query, filtered)
+        with trace.span("sufficiency_gate", attempt=attempt) as span:
+            if settings.ENABLE_SUFFICIENCY_GATE and gate.pass_gate:
+                sufficiency = evaluate_sufficiency(analysis, filtered)
+            else:
+                sufficiency = SufficiencyResult(sufficient=True, coverage=1.0, missing=[])
+            span.attributes.update(
+                sufficient=sufficiency.sufficient,
+                coverage=round(sufficiency.coverage, 2),
+                missing=sufficiency.missing,
+            )
+
+        if gate.pass_gate and sufficiency.sufficient:
+            break
+        if attempt < len(ladder):
+            step = ladder[attempt]
+            attempt += 1
+            with trace.span("retrieval_expansion", strategy=step.strategy, attempt=attempt):
+                extra = await _retrieve_candidates(db, org_id, request, step, scope)
+            tried.append(extra.strategy)
+            candidates = _merge_candidates(candidates, extra.chunks)
+            continue
+        if web_pending:
+            # Last resort, after every internal strategy: external results, clearly labelled.
+            web_pending = False
+            web_executor.ctx.internal_texts = [c.content for c in candidates if not is_external(c)]
+            with trace.span("web_search_fallback") as span:
+                result = await web_executor.call("web_search", {"query": _web_query(request.query)})
+                span.attributes.update(ok=result.ok, results=len(result.chunks))
+            if result.ok and result.chunks:
+                tried.append("web")
+                candidates = _merge_candidates(candidates, result.chunks)
+                continue
+        break
+
+    return _Evidence(
+        retrieval=retrieval,
+        candidates=candidates,
+        reranked=reranked,
+        after_score=after_score,
+        filtered=filtered,
+        filter_drops=outcome.dropped,
+        gate=gate,
+        analysis=analysis,
+        sufficiency=sufficiency,
+        strategies_tried=tried,
+        web_audit=web_executor.audit if web_executor else [],
+    )
+
+
+def _web_query(question: str, limit: int = 200) -> str:
+    q = " ".join(question.split())
+    return q if len(q) <= limit else q[:limit].rsplit(" ", 1)[0]
+
+
+def _web_fallback_executor(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    scope: AccessScope | None,
+    actor: Actor | None,
+) -> ToolExecutor | None:
+    """An executor for the web-search fallback, only when every switch allows it: the user
+    asked (request.web_search), the org opted in and the deployment enables it. Agentic
+    runs get web_search as a planner tool instead of this fallback."""
+    if request.agentic or not request.web_search or actor is None:
+        return None
+    ctx = ToolContext(
+        db=db,
+        org_id=org_id,
+        kb_ids=request.knowledge_base_ids,
+        scope=scope,
+        user_id=actor.user_id,
+        role=actor.role,
+        org_settings=actor.org_settings,
+        web_search_requested=True,
+    )
+    tool = default_registry.get("web_search")
+    if tool is None or tool.denied_reason(ctx) is not None:
+        return None
+    return ToolExecutor(default_registry, ctx)
+
+
+def _tool_audit(ev: _Evidence) -> list[dict]:
+    """Tool-call audit records (agent tools and the web fallback), carried in the internal
+    trace channel to persistence."""
+    agent = ev.retrieval.agent.tool_audit if ev.retrieval.agent else []
+    return [a.model_dump(mode="json") for a in [*agent, *ev.web_audit]]
 
 
 def _route_query(query: str) -> RouteDecision:
@@ -117,33 +430,124 @@ async def _detect_and_resolve_conflicts(
     return resolved
 
 
+@dataclass
+class _Finalized:
+    """Answer after claim verification and conflict handling."""
+
+    answer: str
+    abstained: bool
+    reason: AbstentionReason | None
+    detail: str | None
+    verification_status: VerificationStatus
+    claims: list[ClaimVerification]
+    conflicts: list[ConflictInfo]
+
+
+async def _rewrite_supported_only(
+    question: str, answer: str, outcome: VerificationOutcome, llm: LLMProvider
+) -> str | None:
+    """Drop unsupported claims by rewriting from the supported ones. None if nothing
+    usable remains or the rewrite fails (callers then fall back to abstaining)."""
+    claims = "\n".join(f"- {c.claim}" for c in outcome.supported_claims)
+    if not claims:
+        return None
+    try:
+        response = await llm.generate(
+            messages=[
+                {
+                    "role": "user",
+                    "content": REWRITE_SUPPORTED_ONLY_PROMPT.format(
+                        question=question, claims=claims, answer=answer
+                    ),
+                }
+            ],
+            temperature=0.0,
+            max_tokens=1024,
+        )
+    except Exception as e:
+        logger.warning("answer_rewrite_failed", error=str(e))
+        return None
+    text = response.content.strip()
+    return None if not text or text.upper() == "NONE" else text
+
+
+async def _finalize_answer(
+    question: str, answer: str, chunks: list[RetrievedChunk], llm: LLMProvider
+) -> _Finalized:
+    """Claim verification + conflict handling.
+
+    verified -> keep. partial -> rewrite without the unsupported claims (abstain if the
+    rewrite is impossible). unsupported -> abstain. unverified (the verifier itself
+    failed) -> keep but flag, or abstain when REQUIRE_VERIFICATION is set.
+    """
+    outcome = await claim_verifier.verify(answer, chunks, llm)
+    conflicts = await _detect_and_resolve_conflicts(chunks, llm)
+
+    def abstain(reason: AbstentionReason, detail: str) -> _Finalized:
+        return _Finalized(
+            answer=ABSTENTION_TEMPLATE.format(reason=detail),
+            abstained=True,
+            reason=reason,
+            detail=detail,
+            verification_status=outcome.status,
+            claims=outcome.claims,
+            conflicts=conflicts,
+        )
+
+    if settings.ABSTAIN_ON_UNRESOLVED_CONFLICT and any(not c.resolved for c in conflicts):
+        return abstain(
+            AbstentionReason.conflicting_sources,
+            "The available sources disagree and the disagreement could not be resolved.",
+        )
+
+    final_answer, status = answer, outcome.status
+    if outcome.status == "unsupported":
+        return abstain(
+            AbstentionReason.verification_failed,
+            "The draft answer could not be supported by the retrieved sources.",
+        )
+    if outcome.status == "partial":
+        rewritten = await _rewrite_supported_only(question, answer, outcome, llm)
+        if rewritten is None:
+            return abstain(
+                AbstentionReason.verification_failed,
+                "Parts of the draft answer were not supported by the retrieved sources.",
+            )
+        final_answer = rewritten
+    elif outcome.status == "unverified" and settings.REQUIRE_VERIFICATION:
+        return abstain(
+            AbstentionReason.verification_failed,
+            "The answer could not be verified against the sources.",
+        )
+
+    return _Finalized(
+        answer=final_answer,
+        abstained=False,
+        reason=None,
+        detail=None,
+        verification_status=status,
+        claims=outcome.claims,
+        conflicts=conflicts,
+    )
+
+
 class RAGService:
     async def query(
         self,
         db: AsyncSession,
         org_id: uuid.UUID,
         request: RAGRequest,
+        scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> RAGResponse:
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        # 1. Retrieve
-        with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-            retrieval_result = await _retrieve_candidates(db, org_id, request, route)
-        candidates = retrieval_result.chunks
-
-        # 2. Rerank
-        with trace.span("rerank", candidates_in=len(candidates)):
-            reranked = await _reranker.rerank(request.query, candidates, top_k=10)
-
-        # 3. Filter
-        with trace.span("filter", candidates_in=len(reranked)):
-            filtered = EvidenceFilter.filter_by_score(reranked)
-            filtered = EvidenceFilter.deduplicate(filtered)
-
-        # 4. Evidence gate
-        with trace.span("evidence_gate", candidates=len(filtered)):
-            gate_result = EvidenceGate.evaluate(request.query, filtered)
+        # 1-4. Retrieve, rerank, filter, evidence + sufficiency gates (with bounded expansion)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope, actor)
+        retrieval_result, candidates = ev.retrieval, ev.candidates
+        reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
+        gate_result = ev.gate
 
         retrieval_metadata = {
             "retrieval_time_ms": retrieval_result.retrieval_time_ms,
@@ -151,26 +555,53 @@ class RAGService:
             "candidates_after_rerank": len(reranked),
             "candidates_after_filter": len(filtered),
             "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
+            "strategies_tried": ev.strategies_tried,
+            **({"cag_note": ev.cag_note} if ev.cag_note else {}),
+            "query_intent": ev.analysis.intent,
+            "sufficiency": ev.sufficiency.model_dump(),
         }
         if retrieval_result.agent:
             retrieval_metadata["agent"] = retrieval_result.agent.summary()
 
-        if not gate_result.pass_gate:
-            trace.finish(abstained=True, reason=gate_result.reason)
+        if not ev.passed:
+            trace_id = trace.finish(abstained=True, reason=ev.abstention_detail)["trace_id"]
             return RAGResponse(
-                answer=ABSTENTION_TEMPLATE.format(reason=gate_result.reason),
+                answer=ABSTENTION_TEMPLATE.format(reason=ev.abstention_detail),
                 citations=[],
                 claim_verifications=[],
                 evidence_gate=gate_result,
                 abstained=True,
-                retrieval_metadata=retrieval_metadata,
+                abstention_reason=ev.abstention_reason,
+                retrieval_metadata={**retrieval_metadata, "trace_id": trace_id},
+                trace_stages={
+                    **build_stages(
+                        candidates=candidates,
+                        reranked=reranked,
+                        after_score=after_score,
+                        filter_drops=ev.filter_drops,
+                        filtered=filtered,
+                        selected=[],
+                        cited_chunk_ids=[],
+                    ),
+                    "meta": {
+                        "strategy": retrieval_result.strategy,
+                        "answer_mode": ev.mode_used,
+                        "tool_audit": _tool_audit(ev),
+                    },
+                },
             )
 
         # 5. Assemble context
+        filtered_before_expansion = filtered
         with trace.span("context_assembly"):
-            if settings.ENABLE_NEIGHBOR_EXPANSION:
-                filtered = await expand_with_neighbors(db, org_id, filtered)
-            selected_chunks, context_tokens = ContextAssembler.assemble(filtered)
+            if ev.mode_used != "cag" and settings.ENABLE_NEIGHBOR_EXPANSION:
+                filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
+            if ev.mode_used != "cag" and settings.ENABLE_PARENT_EXPANSION:
+                filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
+            selected_chunks, context_tokens = ContextAssembler.assemble(
+                filtered, max_tokens=settings.CAG_MAX_TOKENS if ev.mode_used == "cag" else None
+            )
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
         retrieval_metadata["context_tokens"] = context_tokens
         retrieval_metadata["chunks_in_context"] = len(selected_chunks)
@@ -199,33 +630,50 @@ class RAGService:
         with trace.span("citation_parsing"):
             citations = CitationParser.parse_citations(llm_response.content, selected_chunks)
 
-        # 8. Claim verification
+        # 8. Claim verification + conflict handling
         with trace.span("claim_verification", claims_checked=len(citations)):
-            claim_verifications = await claim_verifier.verify_claims(
-                llm_response.content, selected_chunks, llm
-            )
-
-        # 9. Conflict detection
-        with trace.span("conflict_detection"):
-            conflicts = await _detect_and_resolve_conflicts(selected_chunks, llm)
+            final = await _finalize_answer(request.query, llm_response.content, selected_chunks, llm)
+        if final.abstained:
+            citations = []
 
         trace_summary = trace.finish(
-            abstained=False,
+            abstained=final.abstained,
+            reason=final.detail,
+            verification_status=final.verification_status,
             citations_found=len(citations),
-            conflicts_detected=len(conflicts),
+            conflicts_detected=len(final.conflicts),
             estimated_cost_usd=retrieval_metadata["estimated_cost_usd"],
         )
         retrieval_metadata["trace_id"] = trace_summary["trace_id"]
         retrieval_metadata["span_ms"] = trace.to_spans_dict()
+        trace_stages = build_stages(
+            candidates=candidates,
+            reranked=reranked,
+            after_score=after_score,
+            filter_drops=ev.filter_drops,
+            filtered=filtered_before_expansion,
+            selected=selected_chunks,
+            cited_chunk_ids=[c.chunk_id for c in citations],
+        )
+        trace_stages["meta"] = {
+            "spans": trace_summary["spans"],
+            "total_ms": trace_summary["total_ms"],
+            "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
+            "tool_audit": _tool_audit(ev),
+        }
 
         return RAGResponse(
-            answer=llm_response.content,
+            answer=final.answer,
             citations=citations,
-            claim_verifications=claim_verifications,
-            conflicts=conflicts,
+            claim_verifications=final.claims,
+            conflicts=final.conflicts,
             evidence_gate=gate_result,
-            abstained=False,
+            abstained=final.abstained,
+            abstention_reason=final.reason,
+            verification_status=final.verification_status,
             retrieval_metadata=retrieval_metadata,
+            trace_stages=trace_stages,
         )
 
     async def query_stream(
@@ -233,39 +681,57 @@ class RAGService:
         db: AsyncSession,
         org_id: uuid.UUID,
         request: RAGRequest,
+        scope: AccessScope | None = None,
+        actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
         """Same pipeline through context assembly, then streams tokens via SSE-shaped events."""
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
-        with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
-            retrieval_result = await _retrieve_candidates(db, org_id, request, route)
+        ev = await _gather_evidence(db, org_id, request, route, trace, scope, actor)
+        retrieval_result = ev.retrieval
+        reranked, after_score, filtered = ev.reranked, ev.after_score, ev.filtered
+        gate_result = ev.gate
 
-        with trace.span("rerank", candidates_in=len(retrieval_result.chunks)):
-            reranked = await _reranker.rerank(request.query, retrieval_result.chunks, top_k=10)
-
-        with trace.span("filter", candidates_in=len(reranked)):
-            filtered = EvidenceFilter.deduplicate(EvidenceFilter.filter_by_score(reranked))
-
-        with trace.span("evidence_gate", candidates=len(filtered)):
-            gate_result = EvidenceGate.evaluate(request.query, filtered)
-
-        if not gate_result.pass_gate:
-            trace.finish(abstained=True, reason=gate_result.reason)
-            abstention_text = ABSTENTION_TEMPLATE.format(reason=gate_result.reason)
+        if not ev.passed:
+            trace_id = trace.finish(abstained=True, reason=ev.abstention_detail)["trace_id"]
+            abstention_text = ABSTENTION_TEMPLATE.format(reason=ev.abstention_detail)
             yield {"type": "token", "content": abstention_text}
             yield {
                 "type": "done",
                 "abstained": True,
+                "abstention_reason": ev.abstention_reason.value,
                 "citations": [],
                 "evidence_gate": gate_result.model_dump(),
+                "trace_id": trace_id,
+                "trace_stages": {
+                    **build_stages(
+                        candidates=ev.candidates,
+                        reranked=reranked,
+                        after_score=after_score,
+                        filter_drops=ev.filter_drops,
+                        filtered=filtered,
+                        selected=[],
+                        cited_chunk_ids=[],
+                    ),
+                    "meta": {
+                        "strategy": retrieval_result.strategy,
+                        "answer_mode": ev.mode_used,
+                        "tool_audit": _tool_audit(ev),
+                    },
+                },
             }
             return
 
+        filtered_before_expansion = filtered
         with trace.span("context_assembly"):
-            if settings.ENABLE_NEIGHBOR_EXPANSION:
-                filtered = await expand_with_neighbors(db, org_id, filtered)
-            selected_chunks, _ = ContextAssembler.assemble(filtered)
+            if ev.mode_used != "cag" and settings.ENABLE_NEIGHBOR_EXPANSION:
+                filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
+            if ev.mode_used != "cag" and settings.ENABLE_PARENT_EXPANSION:
+                filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
+            selected_chunks, _ = ContextAssembler.assemble(
+                filtered, max_tokens=settings.CAG_MAX_TOKENS if ev.mode_used == "cag" else None
+            )
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
 
         llm = get_llm_provider(request.model)
@@ -286,12 +752,9 @@ class RAGService:
             citations = CitationParser.parse_citations(full_answer, selected_chunks)
 
         with trace.span("claim_verification"):
-            claim_verifications = await claim_verifier.verify_claims(
-                full_answer, selected_chunks, llm
-            )
-
-        with trace.span("conflict_detection"):
-            conflicts = await _detect_and_resolve_conflicts(selected_chunks, llm)
+            final = await _finalize_answer(request.query, full_answer, selected_chunks, llm)
+        if final.abstained:
+            citations = []
 
         # Streaming responses don't carry token usage on the wire, so cost is
         # a tiktoken-based estimate rather than the exact figure query() gets.
@@ -305,18 +768,43 @@ class RAGService:
         )
 
         trace_summary = trace.finish(
-            abstained=False,
+            abstained=final.abstained,
+            reason=final.detail,
+            verification_status=final.verification_status,
             citations_found=len(citations),
-            conflicts_detected=len(conflicts),
+            conflicts_detected=len(final.conflicts),
             estimated_cost_usd=estimated_cost,
         )
 
+        trace_stages = build_stages(
+            candidates=ev.candidates,
+            reranked=reranked,
+            after_score=after_score,
+            filter_drops=ev.filter_drops,
+            filtered=filtered_before_expansion,
+            selected=selected_chunks,
+            cited_chunk_ids=[c.chunk_id for c in citations],
+        )
+        trace_stages["meta"] = {
+            "spans": trace_summary["spans"],
+            "total_ms": trace_summary["total_ms"],
+            "strategy": retrieval_result.strategy,
+            "answer_mode": ev.mode_used,
+            "tool_audit": _tool_audit(ev),
+        }
+
         yield {
             "type": "done",
-            "abstained": False,
+            "trace_stages": trace_stages,
+            "abstained": final.abstained,
+            "abstention_reason": final.reason.value if final.reason else None,
+            "verification_status": final.verification_status,
+            # Tokens were already streamed; when verification changed the answer the client
+            # replaces what it showed with this.
+            "final_answer": final.answer if final.answer != full_answer else None,
             "citations": [c.model_dump(mode="json") for c in citations],
-            "claim_verifications": [c.model_dump() for c in claim_verifications],
-            "conflicts": [c.model_dump() for c in conflicts],
+            "claim_verifications": [c.model_dump() for c in final.claims],
+            "conflicts": [c.model_dump() for c in final.conflicts],
             "evidence_gate": gate_result.model_dump(),
             "cost_metadata": {
                 "estimated_prompt_tokens": estimated_prompt_tokens,

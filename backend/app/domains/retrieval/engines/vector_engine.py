@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.retrieval.access import AccessScope
 from app.domains.retrieval.engines.base import RetrievalEngine
 from app.domains.retrieval.filters import apply_common_filters
 from app.domains.retrieval.mapping import row_to_retrieved_chunk
@@ -22,6 +23,7 @@ class VectorRetrievalEngine(RetrievalEngine):
         top_k: int,
         filters: RetrievalFilters | None = None,
         embedding_model: str = "text-embedding-3-small",
+        scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
         provider = get_embedding_provider(embedding_model)
         query_embedding = await provider.embed_query(query)
@@ -36,7 +38,7 @@ class VectorRetrievalEngine(RetrievalEngine):
                 Chunk.embedding.is_not(None),
             )
         )
-        stmt = apply_common_filters(stmt, filters)
+        stmt = apply_common_filters(stmt, filters, scope)
         stmt = stmt.order_by(distance).limit(top_k)
 
         result = await db.execute(stmt)
