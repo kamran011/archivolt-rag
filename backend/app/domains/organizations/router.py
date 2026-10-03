@@ -36,8 +36,8 @@ async def list_orgs(
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    orgs = await org_service.list_for_user(db, current_user.id)
-    return [OrgResponse(**o.__dict__) for o in orgs]
+    rows = await org_service.list_for_user(db, current_user.id)
+    return [OrgResponse(**o.__dict__, member_count=n, role=role) for o, role, n in rows]
 
 
 @router.get("/{org_id}", response_model=OrgResponse)
@@ -48,7 +48,8 @@ async def get_org(
 ):
     org = await org_service.get(db, org_id, current_user.id)
     count = await org_service.member_count(db, org.id)
-    return OrgResponse(**org.__dict__, member_count=count, role=current_user.role)
+    role = await org_service.member_role(db, org.id, current_user.id)
+    return OrgResponse(**org.__dict__, member_count=count, role=role)
 
 
 @router.patch("/{org_id}", response_model=OrgResponse)
