@@ -30,6 +30,7 @@ from app.domains.rag.stages import build_stages
 from app.domains.retrieval.access import AccessScope, Actor
 from app.domains.retrieval.analyzer import QueryAnalysis, analyze_query
 from app.domains.retrieval.cag import CagContext, load_cag_context
+from app.domains.retrieval.decisions.registry import get_decision_provider
 from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, is_external
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
 from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
@@ -51,6 +52,7 @@ from app.providers.reranker.registry import get_reranker
 logger = structlog.get_logger()
 
 _reranker = get_reranker()
+_decision_provider = get_decision_provider()
 
 AGENTIC_MAX_CANDIDATES = 30
 
@@ -303,7 +305,7 @@ async def _gather_rag_evidence(
             gate = EvidenceGate.evaluate(request.query, filtered)
         with trace.span("sufficiency_gate", attempt=attempt) as span:
             if settings.ENABLE_SUFFICIENCY_GATE and gate.pass_gate:
-                sufficiency = evaluate_sufficiency(analysis, filtered)
+                sufficiency = await _decision_provider.evaluate_sufficiency(analysis, filtered)
             else:
                 sufficiency = SufficiencyResult(sufficient=True, coverage=1.0, missing=[])
             span.attributes.update(

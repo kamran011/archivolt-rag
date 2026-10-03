@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     CAG_MAX_TOKENS: int = 12000
     # Sufficiency gate: does the evidence cover what the question needs?
     ENABLE_SUFFICIENCY_GATE: bool = True
+    DECISION_PROVIDER: str = "rules"  # rules | llm | jev (llm/jev land in V2)
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence
     SUFFICIENCY_HIGH_CONFIDENCE: float = 0.8  # a reranker score this high overrides lexical gaps
     MAX_RETRIEVAL_EXPANSIONS: int = 2  # extra strategies tried when evidence is insufficient

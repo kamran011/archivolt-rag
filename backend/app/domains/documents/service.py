@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
+from app.domains.documents.connectors.registry import get_knowledge_connector
 from app.domains.documents.schemas import DocumentUpdate
 from app.domains.documents.storage import storage_service
-from app.domains.documents.upload_safety import read_limited, sanitize_filename, sniff_content
+from app.domains.documents.upload_safety import sanitize_filename, sniff_content
 from app.domains.knowledge_bases.service import kb_service
 from app.domains.retrieval.access import AccessScope, visible_document_clause
 from app.models.chunk import Chunk
@@ -45,6 +46,9 @@ ALLOWED_EXTENSIONS: dict[str, FileType] = {
 
 
 class DocumentService:
+    def __init__(self) -> None:
+        self._connector = get_knowledge_connector()
+
     def _validate_upload(self, file: UploadFile) -> FileType:
         if not file.filename:
             raise ValidationError("File must have a name")
@@ -212,9 +216,12 @@ class DocumentService:
         file_type = self._validate_upload(file)
         safe_name = sanitize_filename(file.filename)
 
-        content = await read_limited(
-            file, settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024, settings.MAX_UPLOAD_SIZE_MB
+        raw = await self._connector.fetch(
+            file,
+            max_bytes=settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024,
+            max_mb=settings.MAX_UPLOAD_SIZE_MB,
         )
+        content = raw.content
         if len(content) == 0:
             raise ValidationError("File is empty")
         sniff_content(content, file_type)
