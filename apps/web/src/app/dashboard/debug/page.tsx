@@ -56,7 +56,7 @@ function StageCard({ stage }: { stage: DebugStage }) {
     <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+        className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary"
       >
         <span className="font-medium text-sm text-gray-900 capitalize">{stage.name}</span>
         <span className="text-xs text-gray-400">
@@ -150,7 +150,7 @@ export default function RetrievalDebuggerPage() {
           <button
             type="submit"
             disabled={loading || !query.trim() || kbIds.length === 0}
-            className="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="cursor-pointer rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Running…" : "Run"}
           </button>

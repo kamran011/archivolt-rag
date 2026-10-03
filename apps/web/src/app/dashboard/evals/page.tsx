@@ -210,7 +210,7 @@ export default function EvalLabPage() {
             <button
               disabled={busy || !name.trim() || !jsonl.trim()}
               onClick={() => void guard(createDataset)}
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save dataset
             </button>
@@ -291,7 +291,7 @@ export default function EvalLabPage() {
                 busy || !selectedDataset || kbIds.length === 0 || configCount === 0 || configCount > 8
               }
               onClick={() => void guard(startRuns)}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start {configCount} run{configCount === 1 ? "" : "s"}
             </button>
@@ -309,7 +309,7 @@ export default function EvalLabPage() {
           <button
             disabled={picked.length !== 2 || busy}
             onClick={() => void guard(compareSelected)}
-            className="rounded-md border border-gray-300 px-3 py-1 text-xs disabled:opacity-40"
+            className="cursor-pointer rounded-md border border-gray-300 px-3 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Check regressions (first = baseline)
           </button>

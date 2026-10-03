@@ -73,7 +73,7 @@ export default function CitationChip({
         }}
         aria-expanded={open}
         aria-label={`Source ${citation.index}: ${citation.document_title}`}
-        className={`inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-medium align-super transition-colors ${
+        className={`cursor-pointer inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-medium align-super transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
           external
             ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
             : "bg-primary/15 text-primary-dark hover:bg-primary/25"

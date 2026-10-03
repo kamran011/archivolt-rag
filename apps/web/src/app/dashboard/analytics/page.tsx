@@ -73,7 +73,7 @@ export default function AnalyticsPage() {
             <button
               key={r}
               onClick={() => selectRange(r)}
-              className={`px-3 py-1.5 ${days === r ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+              className={`cursor-pointer px-3 py-1.5 ${days === r ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
             >
               {r}d
             </button>

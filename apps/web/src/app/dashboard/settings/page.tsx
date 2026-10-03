@@ -151,7 +151,7 @@ export default function SettingsPage() {
                             await reloadMembers();
                           });
                         }}
-                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                        className="cursor-pointer text-xs text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Remove
                       </button>
@@ -205,7 +205,7 @@ export default function SettingsPage() {
             </label>
             <button
               disabled={busy || !newUserId.trim()}
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add member
             </button>

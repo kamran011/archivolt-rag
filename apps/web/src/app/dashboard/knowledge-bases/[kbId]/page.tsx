@@ -167,7 +167,7 @@ export default function KnowledgeBaseDetailPage({
                     </Link>
                     <button
                       onClick={() => deleteDocument(doc.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
+                      className="cursor-pointer text-red-500 hover:text-red-700 text-xs"
                     >
                       Delete
                     </button>

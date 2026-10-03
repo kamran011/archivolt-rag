@@ -59,7 +59,7 @@ export default function DocumentInspectorPage({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-2 text-sm -mb-px border-b-2 ${
+            className={`cursor-pointer px-3 py-2 text-sm -mb-px border-b-2 ${
               tab === t.id
                 ? "border-blue-600 text-blue-700 font-medium"
                 : "border-transparent text-gray-500 hover:text-gray-800"
@@ -223,7 +223,7 @@ function Overview({
             <button
               onClick={() => void save()}
               disabled={saving}
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save
             </button>
@@ -242,7 +242,7 @@ function Overview({
             {(access.data ?? []).map((u) => (
               <li key={u} className="flex items-center justify-between py-1.5">
                 <span className="font-mono text-xs text-gray-700">{u}</span>
-                <button onClick={() => void revoke(u)} className="text-xs text-red-500">
+                <button onClick={() => void revoke(u)} className="cursor-pointer text-xs text-red-500">
                   Revoke
                 </button>
               </li>
@@ -261,7 +261,7 @@ function Overview({
             <button
               onClick={() => void grant()}
               disabled={!grantee.trim()}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Grant
             </button>
@@ -317,7 +317,7 @@ function Chunks({ base, orgId }: { base: string; orgId: string | undefined }) {
         <button
           disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE))}
-          className="rounded border px-2 py-1 disabled:opacity-40"
+          className="cursor-pointer rounded border px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Previous
         </button>
@@ -327,7 +327,7 @@ function Chunks({ base, orgId }: { base: string; orgId: string | undefined }) {
         <button
           disabled={offset + PAGE >= total}
           onClick={() => setOffset(offset + PAGE)}
-          className="rounded border px-2 py-1 disabled:opacity-40"
+          className="cursor-pointer rounded border px-2 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Next
         </button>

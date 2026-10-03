@@ -43,7 +43,7 @@ export default function KBSelector({ selectedIds, onChange }: KBSelectorProps) {
           <button
             key={kb.id}
             onClick={() => toggle(kb.id)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            className={`cursor-pointer text-xs px-2.5 py-1 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
               selected
                 ? "bg-blue-600 border-blue-600 text-white"
                 : "bg-white border-gray-300 text-gray-600 hover:border-gray-400"
