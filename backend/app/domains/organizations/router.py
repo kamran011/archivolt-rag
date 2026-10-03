@@ -24,7 +24,7 @@ router = APIRouter()
 async def create_org(
     data: OrgCreate,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     org = await org_service.create(db, current_user.id, data)
     count = await org_service.member_count(db, org.id)
@@ -34,7 +34,7 @@ async def create_org(
 @router.get("/", response_model=list[OrgResponse])
 async def list_orgs(
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     orgs = await org_service.list_for_user(db, current_user.id)
     return [OrgResponse(**o.__dict__) for o in orgs]
@@ -44,7 +44,7 @@ async def list_orgs(
 async def get_org(
     org_id: uuid.UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     org = await org_service.get(db, org_id, current_user.id)
     count = await org_service.member_count(db, org.id)
@@ -58,7 +58,7 @@ async def update_org(
     current_user: CurrentUser = Depends(
         require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     org = await org_service.update(db, org_id, data)
     count = await org_service.member_count(db, org.id)
@@ -69,7 +69,7 @@ async def update_org(
 async def list_members(
     org_id: uuid.UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Verify membership first
     await org_service.get(db, org_id, current_user.id)
@@ -84,7 +84,7 @@ async def add_member(
     current_user: CurrentUser = Depends(
         require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     member = await org_service.add_member(db, org_id, data)
     return OrgMemberResponse.model_validate(member)
@@ -96,7 +96,7 @@ async def update_member_role(
     member_id: uuid.UUID,
     data: OrgMemberUpdate,
     current_user: CurrentUser = Depends(require_role_in_path_org(OrgRole.owner)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     member = await org_service.update_member_role(db, org_id, member_id, data)
     return OrgMemberResponse.model_validate(member)
@@ -109,6 +109,6 @@ async def remove_member(
     current_user: CurrentUser = Depends(
         require_role_in_path_org(OrgRole.admin, OrgRole.owner)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await org_service.remove_member(db, org_id, member_id, current_user.id)

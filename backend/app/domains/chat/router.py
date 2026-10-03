@@ -33,7 +33,7 @@ router = APIRouter()
 async def send_message(
     request: ChatRequest,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if request.stream:
         return StreamingResponse(
@@ -83,7 +83,7 @@ async def _stream_response(
 @router.get("/conversations", response_model=list[ConversationResponse])
 async def list_conversations(
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     convs = await chat_service.list_conversations(
         db, current_user.organization_id, current_user.id
@@ -95,7 +95,7 @@ async def list_conversations(
 async def get_conversation(
     conv_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     conv = await chat_service.get_conversation(
         db, current_user.organization_id, conv_id, current_user.id
@@ -117,7 +117,7 @@ async def get_conversation(
 async def delete_conversation(
     conv_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await chat_service.delete_conversation(
         db, current_user.organization_id, conv_id, current_user.id

@@ -30,7 +30,7 @@ async def trigger_ingestion(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin, OrgRole.member)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Verify the document belongs to this org (and is visible to the caller) before queueing
     await document_service.get(
@@ -53,7 +53,7 @@ async def trigger_reprocess(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await document_service.get(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)
@@ -68,7 +68,7 @@ async def trigger_reprocess(
 async def get_ingestion_status(
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     doc = await document_service.get(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)

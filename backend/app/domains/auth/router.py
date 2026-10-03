@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 @router.post("/verify")
 async def verify_token(
     body: TokenVerifyRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Validate a Supabase access token and return user info."""
     user_id, email = await decode_access_token(body.access_token)
@@ -38,7 +38,7 @@ async def verify_token(
 @router.get("/me", response_model=AuthMeResponse)
 async def get_me(
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Return the authenticated user's profile and organization memberships."""
     stmt = select(OrganizationMember).where(

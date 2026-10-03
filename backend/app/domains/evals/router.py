@@ -64,7 +64,7 @@ class RunDetail(RunView):
 async def create_dataset(
     body: DatasetCreate,
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     ds = await eval_service.create_dataset(
         db, current_user.organization_id, current_user.id, body.name, body.jsonl
@@ -75,7 +75,7 @@ async def create_dataset(
 
 @router.get("/datasets", response_model=list[DatasetView])
 async def list_datasets(
-    current_user: CurrentUser = Depends(admin_only), db: AsyncSession = Depends(get_db)
+    current_user: CurrentUser = Depends(admin_only), db: AsyncSession = Depends(get_db, scope="function")
 ):
     return await eval_service.list_datasets(db, current_user.organization_id)
 
@@ -84,7 +84,7 @@ async def list_datasets(
 async def get_dataset(
     dataset_id: uuid.UUID,
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await eval_service.get_dataset(db, current_user.organization_id, dataset_id)
 
@@ -94,7 +94,7 @@ async def start_runs(
     body: RunCreate,
     background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Starts one run per configuration (e.g. hybrid vs tree, rag vs cag)."""
     runs = await eval_service.start_runs(
@@ -110,7 +110,7 @@ async def start_runs(
 async def list_runs(
     limit: int = Query(default=50, ge=1, le=200),
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await eval_service.list_runs(db, current_user.organization_id, limit)
 
@@ -120,7 +120,7 @@ async def compare_runs(
     baseline: uuid.UUID,
     candidate: uuid.UUID,
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await eval_service.compare_runs(db, current_user.organization_id, baseline, candidate)
 
@@ -129,6 +129,6 @@ async def compare_runs(
 async def get_run(
     run_id: uuid.UUID,
     current_user: CurrentUser = Depends(admin_only),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await eval_service.get_run(db, current_user.organization_id, run_id)

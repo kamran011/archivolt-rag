@@ -43,7 +43,7 @@ async def upload_document(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin, OrgRole.member)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     doc = await document_service.upload(
         db,
@@ -70,7 +70,7 @@ async def upload_document(
 async def list_documents(
     kb_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     docs = await document_service.list(
         db, current_user.organization_id, kb_id, scope=scope_for(current_user)
@@ -85,7 +85,7 @@ async def list_document_chunks(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """The chunks a document was split into (what retrieval actually indexes)."""
     total, items = await document_service.list_chunks(
@@ -99,7 +99,7 @@ async def get_document_tree(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """The heading outline built at ingestion (used for tree navigation)."""
     doc = await document_service.get(
@@ -114,7 +114,7 @@ async def get_document_summaries(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Navigation summaries (document + sections). Model-written; not evidence."""
     rows = await document_service.list_summaries(
@@ -134,7 +134,7 @@ async def get_document(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     doc = await document_service.get(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)
@@ -150,7 +150,7 @@ async def update_document(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     doc = await document_service.update(
         db, current_user.organization_id, doc_id, data, scope=scope_for(current_user)
@@ -172,7 +172,7 @@ async def create_document_version(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin, OrgRole.member)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     new_doc = await document_service.create_new_version(
         db,
@@ -193,7 +193,7 @@ async def list_document_versions(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     versions = await document_service.list_versions(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)
@@ -208,7 +208,7 @@ async def delete_document(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await document_service.delete(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)
@@ -220,7 +220,7 @@ async def download_document(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     url = await document_service.get_signed_url(
         db, current_user.organization_id, doc_id, scope=scope_for(current_user)
@@ -237,7 +237,7 @@ async def list_document_access(
     kb_id: uuid.UUID,
     doc_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Users explicitly granted access to a restricted document."""
     return await document_service.list_access(
@@ -251,7 +251,7 @@ async def grant_document_access(
     doc_id: uuid.UUID,
     body: AccessGrant,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await document_service.grant_access(
         db, current_user.organization_id, doc_id, body.user_id, scope=scope_for(current_user)
@@ -264,7 +264,7 @@ async def revoke_document_access(
     doc_id: uuid.UUID,
     user_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await document_service.revoke_access(
         db, current_user.organization_id, doc_id, user_id, scope=scope_for(current_user)

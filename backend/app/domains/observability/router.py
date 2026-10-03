@@ -44,7 +44,7 @@ async def list_traces(
     offset: int = Query(default=0, ge=0),
     abstained: bool | None = None,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Recent RAG traces for the organization (admin/owner: traces contain user questions)."""
     stmt = select(RagTrace).where(RagTrace.organization_id == current_user.organization_id)
@@ -71,7 +71,7 @@ class ToolCallView(BaseModel):
 async def get_trace_tool_calls(
     trace_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Every tool call the agent attempted for this trace (including denied/failed ones)."""
     stmt = (
@@ -89,7 +89,7 @@ async def get_trace_tool_calls(
 async def get_trace(
     trace_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_role(OrgRole.owner, OrgRole.admin)),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Full stage-by-stage trace: what was retrieved, reranked, filtered, selected and
     cited, and why candidates were excluded. Org-scoped; other orgs' ids look like 404."""

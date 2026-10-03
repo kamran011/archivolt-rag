@@ -21,7 +21,7 @@ router = APIRouter()
 async def search(
     request: RetrievalRequest,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await retrieval_service.retrieve(
         db, current_user.organization_id, request, scope=scope_for(current_user)
@@ -36,7 +36,7 @@ async def search(
 async def debug(
     request: DebugRequest,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Stage-by-stage retrieval trace (routing, engines, rerank, filters, gate,
     context). Same org scoping as /search; no answer is generated."""

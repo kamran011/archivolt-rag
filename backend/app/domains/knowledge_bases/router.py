@@ -22,7 +22,7 @@ async def create_kb(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin, OrgRole.member)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if data.cag_enabled and current_user.role not in (OrgRole.owner, OrgRole.admin):
         # CAG sends the whole KB to the LLM on every question: a cost decision for admins.
@@ -35,7 +35,7 @@ async def create_kb(
 async def list_kbs(
     include_archived: bool = False,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     kbs = await kb_service.list(db, current_user.organization_id, include_archived)
     return [KBResponse.model_validate(kb) for kb in kbs]
@@ -45,7 +45,7 @@ async def list_kbs(
 async def get_kb(
     kb_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     kb = await kb_service.get(db, current_user.organization_id, kb_id)
     return KBResponse.model_validate(kb)
@@ -58,7 +58,7 @@ async def update_kb(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     kb = await kb_service.update(db, current_user.organization_id, kb_id, data)
     return KBResponse.model_validate(kb)
@@ -70,7 +70,7 @@ async def archive_kb(
     current_user: CurrentUser = Depends(
         require_role(OrgRole.owner, OrgRole.admin)
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await kb_service.archive(db, current_user.organization_id, kb_id)
 
@@ -79,7 +79,7 @@ async def archive_kb(
 async def get_kb_stats(
     kb_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await kb_service.get_stats(db, current_user.organization_id, kb_id)
 
@@ -88,7 +88,7 @@ async def get_kb_stats(
 async def cag_info(
     kb_id: uuid.UUID,
     current_user: CurrentUser = Depends(require_org),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Is CAG usable for this knowledge base right now, for *this* caller? Size is measured
     over the content the caller can see, without loading any text."""

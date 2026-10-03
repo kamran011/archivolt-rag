@@ -81,7 +81,7 @@ async def decode_access_token(token: str) -> tuple[uuid.UUID, str]:
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     x_organization_id: str | None = Header(default=None, alias="X-Organization-Id"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> CurrentUser:
     if not credentials:
         raise UnauthorizedError("Missing authorization token")
