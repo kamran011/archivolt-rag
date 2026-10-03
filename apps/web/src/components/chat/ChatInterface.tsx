@@ -72,7 +72,8 @@ export default function ChatInterface() {
     <div className="flex h-full gap-4">
       <section
         aria-label="Conversation"
-        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-bg-white shadow-sm"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-bg-white"
+        style={{ boxShadow: "0 0 40px 4px rgba(112, 144, 176, 0.2)" }}
       >
         <div className="flex items-center gap-3 px-5 py-3">
           <ChatAvatar size={36} />
