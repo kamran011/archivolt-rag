@@ -19,7 +19,7 @@ async def verify_token(
     db: AsyncSession = Depends(get_db),
 ):
     """Validate a Supabase access token and return user info."""
-    user_id, email = decode_access_token(body.access_token)
+    user_id, email = await decode_access_token(body.access_token)
 
     # Return memberships
     stmt = select(OrganizationMember).where(OrganizationMember.user_id == user_id)

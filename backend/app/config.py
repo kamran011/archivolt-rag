@@ -13,8 +13,9 @@ class Settings(BaseSettings):
     SUPABASE_DB_URL: str  # postgresql+asyncpg://...
 
     # Auth
-    JWT_SECRET: str
+    JWT_SECRET: str = ""  # legacy shared-secret (HS256) projects; empty disables HS256
     JWT_ALGORITHM: str = "HS256"
+    JWT_JWKS_URL: str | None = None  # default: {SUPABASE_URL}/auth/v1/.well-known/jwks.json
     JWT_AUDIENCE: str = "authenticated"  # Supabase user access tokens
 
     # AI Providers

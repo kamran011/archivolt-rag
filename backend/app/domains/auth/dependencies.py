@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
+from app.core.jwks import JWKSUnavailableError, jwks_cache
 from app.domains.auth.schemas import CurrentUser
 from app.models.organization_member import OrganizationMember, OrgRole
 
@@ -18,14 +19,47 @@ logger = structlog.get_logger()
 security = HTTPBearer(auto_error=False)
 
 
-def decode_access_token(token: str) -> tuple[uuid.UUID, str]:
+ASYMMETRIC_ALGORITHMS = {"ES256", "RS256"}
+
+
+async def _verification_key_and_alg(token: str) -> tuple[str | dict, str]:
+    """Chooses the verification key from the token header's alg. The alg is
+    only ever used to *select among our own allowed key types* — HS256 is
+    verified solely against the configured secret and asymmetric algs solely
+    against the issuer's published keys, so a forged header can't downgrade
+    verification (e.g. HMAC-signing with a public key)."""
+    try:
+        header = jwt.get_unverified_header(token)
+    except JWTError as e:
+        raise UnauthorizedError("Invalid or expired token") from e
+
+    alg = header.get("alg")
+    if alg == "HS256":
+        if not settings.JWT_SECRET:
+            raise UnauthorizedError("Invalid or expired token")
+        return settings.JWT_SECRET, alg
+    if alg in ASYMMETRIC_ALGORITHMS:
+        try:
+            jwk = await jwks_cache.get_key(header.get("kid"))
+        except JWKSUnavailableError as e:
+            # Fail closed: never accept a token we cannot verify.
+            logger.error("jwks_unavailable", error=str(e))
+            raise UnauthorizedError("Unable to verify token") from e
+        if jwk is None or jwk.get("alg", alg) != alg:
+            raise UnauthorizedError("Invalid or expired token")
+        return jwk, alg
+    raise UnauthorizedError("Invalid or expired token")
+
+
+async def decode_access_token(token: str) -> tuple[uuid.UUID, str]:
     """Validate a Supabase access token (signature, expiry, audience) and return
     (user_id, email). Single place tokens are verified."""
+    key, alg = await _verification_key_and_alg(token)
     try:
         payload = jwt.decode(
             token,
-            settings.JWT_SECRET,
-            algorithms=[settings.JWT_ALGORITHM],
+            key,
+            algorithms=[alg],
             audience=settings.JWT_AUDIENCE,
             # jose skips the audience check when the claim is absent unless required.
             options={"require_aud": True},
@@ -52,7 +86,7 @@ async def get_current_user(
     if not credentials:
         raise UnauthorizedError("Missing authorization token")
 
-    user_id, email = decode_access_token(credentials.credentials)
+    user_id, email = await decode_access_token(credentials.credentials)
 
     if not x_organization_id:
         return CurrentUser(id=user_id, email=email)
