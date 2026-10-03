@@ -126,7 +126,7 @@ export default function MessageBubble({
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
+        <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
           {message.content}
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function MessageBubble({
       <ChatAvatar size={32} />
       <div className="max-w-[75%]">
       <div
-        className={`rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm whitespace-pre-wrap bg-bg text-text ${
+        className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-gray-100 text-text ${
           selected ? "ring-2 ring-primary/40" : ""
         }`}
       >

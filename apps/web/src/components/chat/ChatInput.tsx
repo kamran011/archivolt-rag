@@ -33,8 +33,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <div className="flex items-end gap-2">
-      <div className="flex-1 bg-bg rounded-full px-4 py-2.5">
+    <div className="flex items-end gap-3.5">
+      <div className="flex-1 bg-bg-white border border-border rounded-full px-4 py-3">
         <textarea
           ref={textareaRef}
           value={value}
@@ -50,7 +50,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         onClick={handleSend}
         disabled={disabled || !value.trim()}
         aria-label="Send message"
-        className="shrink-0 w-10 h-10 rounded-full bg-cta hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-white"
+        className="shrink-0 w-11 h-11 rounded-full bg-cta hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-white cursor-pointer"
+        style={{ boxShadow: "0 8px 20px rgba(106, 53, 255, 0.35)" }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M3 11.5L21 3l-8.5 18-2.3-7.2L3 11.5z" />

@@ -47,7 +47,14 @@ function Box({ stage, n }: { stage: Stage; n: number }) {
         {stage.name}
       </p>
       <p className="mt-1 text-xs text-gray-500">{stage.what}</p>
-      {stage.guard && <p className="mt-1 text-xs text-green-700">🛡 {stage.guard}</p>}
+      {stage.guard && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
+          <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" />
+          </svg>
+          {stage.guard}
+        </p>
+      )}
     </li>
   );
 }

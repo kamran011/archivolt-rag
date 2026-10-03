@@ -56,7 +56,10 @@ export default function DocumentUploader({ onUpload }: DocumentUploaderProps) {
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <div className="text-3xl mb-2">📄</div>
+        <svg className="mx-auto mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l-5-5-5 5M12 3v12" />
+        </svg>
         <p className="text-sm text-gray-600">
           {uploading ? "Uploading…" : "Drag & drop files, or click to browse"}
         </p>

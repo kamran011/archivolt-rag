@@ -83,12 +83,17 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-      <div className="px-4 py-5 border-b border-gray-100">
-        <span className="text-lg font-bold text-gray-900">Archivolt</span>
+    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <div className="h-16 flex items-center gap-2.5 px-5 border-b border-gray-100">
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="shrink-0">
+          <circle cx="14" cy="14" r="5" stroke="var(--primary)" strokeWidth="2.2" />
+          <circle cx="14" cy="14" r="9.5" stroke="var(--primary)" strokeWidth="2" opacity="0.55" />
+          <circle cx="14" cy="14" r="13" stroke="var(--primary)" strokeWidth="1.6" opacity="0.3" />
+        </svg>
+        <span className="text-lg font-bold text-gray-900 tracking-tight">Archivolt</span>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const active =
             item.href === "/dashboard"
@@ -98,13 +103,16 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
                 active
-                  ? "bg-blue-50 text-blue-700 font-medium"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "text-primary font-semibold"
+                  : "text-gray-500 font-medium hover:bg-gray-50 hover:text-gray-800"
               }`}
             >
-              {item.icon}
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-primary" />
+              )}
+              <span className={active ? "text-primary" : ""}>{item.icon}</span>
               {item.label}
             </Link>
           );

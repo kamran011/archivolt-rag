@@ -18,11 +18,11 @@ export default async function DashboardLayout({
 
   return (
     <OrganizationProvider>
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
         <Sidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
           <Header user={user} />
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-7">{children}</main>
         </div>
       </div>
     </OrganizationProvider>
