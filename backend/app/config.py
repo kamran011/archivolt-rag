@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     # AI Providers
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str = ""
+    # Chat/rerank/vision LLM endpoint. Any OpenAI-compatible API works, e.g. OpenRouter:
+    #   LLM_BASE_URL=https://openrouter.ai/api/v1  LLM_API_KEY=<openrouter key>
+    #   DEFAULT_LLM_MODEL=<an OpenRouter model id>  RERANKER_MODEL=<same or another>
+    # Unset = OpenAI with OPENAI_API_KEY.
+    LLM_BASE_URL: str | None = None
+    LLM_API_KEY: str | None = None  # falls back to OPENAI_API_KEY
+    # Embeddings are configured separately: OpenRouter's free models are chat-only, so
+    # embeddings usually stay on OpenAI (or another OpenAI-compatible embeddings endpoint).
+    EMBEDDING_BASE_URL: str | None = None
+    EMBEDDING_API_KEY: str | None = None  # falls back to OPENAI_API_KEY
 
     # App
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]

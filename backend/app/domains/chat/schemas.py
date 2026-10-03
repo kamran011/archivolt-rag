@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.config import settings
 from app.models.message import MessageRole
 
 
@@ -11,7 +12,7 @@ class ChatRequest(BaseModel):
     message: str
     knowledge_base_ids: list[uuid.UUID]
     conversation_id: uuid.UUID | None = None
-    model: str = "gpt-4o"
+    model: str = Field(default_factory=lambda: settings.DEFAULT_LLM_MODEL)
     stream: bool = True
     agentic: bool = False
     web_search: bool = False  # allow external web results (still needs org opt-in)

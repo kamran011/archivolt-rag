@@ -21,7 +21,10 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     ) -> None:
         self.model_name = model_name or settings.EMBEDDING_MODEL
         self.dimensions = dimensions or settings.EMBEDDING_DIMENSIONS
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self._client = AsyncOpenAI(
+            api_key=settings.EMBEDDING_API_KEY or settings.OPENAI_API_KEY,
+            base_url=settings.EMBEDDING_BASE_URL,
+        )
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not texts:

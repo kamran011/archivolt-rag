@@ -63,7 +63,8 @@ export async function* streamChat(
       message: params.message,
       knowledge_base_ids: params.knowledgeBaseIds,
       conversation_id: params.conversationId,
-      model: params.model || "gpt-4o",
+      // Omitted unless set: the server applies its configured DEFAULT_LLM_MODEL.
+      ...(params.model ? { model: params.model } : {}),
       stream: true,
       agentic: params.agentic ?? false,
       web_search: params.webSearch ?? false,

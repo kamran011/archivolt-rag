@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.config import settings
 from app.domains.retrieval.evidence_gate import EvidenceGateResult
 
 
@@ -11,7 +12,7 @@ class RAGRequest(BaseModel):
     query: str
     knowledge_base_ids: list[uuid.UUID]
     conversation_history: list[dict] | None = None
-    model: str = "gpt-4o"
+    model: str = Field(default_factory=lambda: settings.DEFAULT_LLM_MODEL)
     temperature: float = 0.1
     agentic: bool = False
     web_search: bool = False  # the user asked to allow external web results

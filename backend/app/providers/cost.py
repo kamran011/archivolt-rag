@@ -24,6 +24,8 @@ _DEFAULT_EMBEDDING_RATE = 0.02
 
 
 def _lookup_llm_rate(model: str) -> tuple[float, float]:
+    if model.endswith(":free"):  # OpenRouter free-tier models
+        return (0.0, 0.0)
     for known_model, rate in _LLM_RATES.items():
         if model.startswith(known_model):
             return rate

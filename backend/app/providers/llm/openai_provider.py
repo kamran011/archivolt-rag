@@ -8,9 +8,12 @@ from app.providers.llm.base import LLMProvider, LLMResponse
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, model: str = "gpt-4o") -> None:
-        self.model = model
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    def __init__(self, model: str | None = None) -> None:
+        self.model = model or settings.DEFAULT_LLM_MODEL
+        self._client = AsyncOpenAI(
+            api_key=settings.LLM_API_KEY or settings.OPENAI_API_KEY,
+            base_url=settings.LLM_BASE_URL,
+        )
 
     async def generate(
         self,
