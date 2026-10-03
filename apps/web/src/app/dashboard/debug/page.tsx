@@ -50,10 +50,12 @@ function ChunkRow({ chunk, rank }: { chunk: DebugChunk; rank: number }) {
   );
 }
 
+// Flat: stacked inside one elevated panel (see the result.stages block below),
+// so each accordion row only needs a hairline border, not its own shadow.
 function StageCard({ stage }: { stage: DebugStage }) {
   const [open, setOpen] = useState(stage.chunks.length <= 10);
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <section className="rounded-xl border border-border overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary"
@@ -111,14 +113,14 @@ export default function RetrievalDebuggerPage() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <h1 className="text-2xl font-semibold text-gray-900">Retrieval Debugger</h1>
       <p className="text-gray-500 text-sm mt-1 mb-6">
         See what each retrieval stage kept or dropped for a question, and why. No answer is
         generated.
       </p>
 
-      <form onSubmit={run} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <form onSubmit={run} className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 space-y-4">
         <div>
           <label className="text-xs font-medium text-gray-500">Question</label>
           <input
@@ -165,7 +167,7 @@ export default function RetrievalDebuggerPage() {
 
       {result && (
         <div className="mt-6 space-y-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-4 text-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p className="text-xs text-gray-500">Route</p>
               <p className="font-medium text-gray-900">{result.route.strategy}</p>
@@ -193,9 +195,13 @@ export default function RetrievalDebuggerPage() {
               </p>
             </div>
           </div>
-          {result.stages.map((s, i) => (
-            <StageCard key={`${s.name}-${i}`} stage={s} />
-          ))}
+          {result.stages.length > 0 && (
+            <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-4 space-y-3">
+              {result.stages.map((s, i) => (
+                <StageCard key={`${s.name}-${i}`} stage={s} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

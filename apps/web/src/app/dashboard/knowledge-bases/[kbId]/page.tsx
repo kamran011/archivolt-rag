@@ -67,8 +67,8 @@ export default function KnowledgeBaseDetailPage({
         </p>
       )}
 
-      <section className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <label className="flex items-start gap-2 text-sm">
+      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-6 mb-8">
+        <label className="flex items-start gap-3 text-sm">
           <input
             type="checkbox"
             className="mt-0.5"
@@ -95,7 +95,7 @@ export default function KnowledgeBaseDetailPage({
         {!canManage && <p className="text-xs text-gray-400 mt-2">Only admins can change this.</p>}
       </section>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <DocumentUploader onUpload={uploadDocument} />
       </div>
 
@@ -108,26 +108,26 @@ export default function KnowledgeBaseDetailPage({
       {loading ? (
         <div className="text-gray-400 text-sm text-center py-8">Loading documents…</div>
       ) : documents.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-10 text-center text-gray-500 text-sm">
           No documents uploaded yet.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-bg-white rounded-2xl border border-border shadow-glow overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="text-left px-4 py-2.5 font-medium">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium">Type</th>
-                <th className="text-left px-4 py-2.5 font-medium">Size</th>
-                <th className="text-left px-4 py-2.5 font-medium">Status</th>
-                <th className="text-left px-4 py-2.5 font-medium">Access &amp; tags</th>
-                <th className="text-right px-4 py-2.5 font-medium">Actions</th>
+                <th className="text-left px-5 py-3 font-medium">Name</th>
+                <th className="text-left px-5 py-3 font-medium">Type</th>
+                <th className="text-left px-5 py-3 font-medium">Size</th>
+                <th className="text-left px-5 py-3 font-medium">Status</th>
+                <th className="text-left px-5 py-3 font-medium">Access &amp; tags</th>
+                <th className="text-right px-5 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {documents.map((doc) => (
                 <tr key={doc.id}>
-                  <td className="px-4 py-2.5 text-gray-900">
+                  <td className="px-5 py-3.5 text-gray-900">
                     <Link
                       href={`/dashboard/knowledge-bases/${kbId}/documents/${doc.id}`}
                       className="hover:underline"
@@ -138,15 +138,15 @@ export default function KnowledgeBaseDetailPage({
                       <span className="ml-2 text-[10px] text-gray-400">v{doc.version}</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-gray-500 uppercase text-xs">{doc.file_type}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{formatBytes(doc.file_size)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5 text-gray-500 uppercase text-xs">{doc.file_type}</td>
+                  <td className="px-5 py-3.5 text-gray-500">{formatBytes(doc.file_size)}</td>
+                  <td className="px-5 py-3.5">
                     <DocumentStatusBadge status={doc.status} />
                     {doc.status === "failed" && doc.error_message && (
                       <p className="text-red-500 text-xs mt-1">{doc.error_message}</p>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-xs">
+                  <td className="px-5 py-3.5 text-xs">
                     {doc.restricted && (
                       <span className="mr-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
                         restricted
@@ -158,19 +158,31 @@ export default function KnowledgeBaseDetailPage({
                       </span>
                     ))}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <Link
-                      href={`/dashboard/knowledge-bases/${kbId}/documents/${doc.id}`}
-                      className="mr-3 text-blue-600 hover:text-blue-800 text-xs"
-                    >
-                      Inspect
-                    </Link>
-                    <button
-                      onClick={() => deleteDocument(doc.id)}
-                      className="cursor-pointer text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Delete
-                    </button>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/dashboard/knowledge-bases/${kbId}/documents/${doc.id}`}
+                        title="Inspect document"
+                        aria-label="Inspect document"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-dark"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => deleteDocument(doc.id)}
+                        title="Delete document"
+                        aria-label="Delete document"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9.5 7V5a1 1 0 011-1h3a1 1 0 011 1v2m2 0-.7 12.1a2 2 0 01-2 1.9H8.2a2 2 0 01-2-1.9L5.5 7h13z" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

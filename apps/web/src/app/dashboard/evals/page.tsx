@@ -153,7 +153,7 @@ export default function EvalLabPage() {
     .filter((r): r is EvalRun => !!r);
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">Evaluation lab</h1>
         <p className="text-sm text-gray-500">
@@ -167,7 +167,7 @@ export default function EvalLabPage() {
         </div>
       )}
 
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
         <h2 className="font-medium text-gray-900 mb-2">1 · Dataset</h2>
         <p className="text-xs text-gray-500 mb-3">
           JSONL, one case per line: <code>id</code>, <code>question</code>,{" "}
@@ -185,14 +185,14 @@ export default function EvalLabPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Dataset name"
-            className="rounded-md border border-gray-200 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm"
           />
           <textarea
             value={jsonl}
             onChange={(e) => setJsonl(e.target.value)}
             rows={5}
             placeholder='{"id":"q1","question":"…","gold_documents":["Refund Policy"]}'
-            className="rounded-md border border-gray-200 px-2 py-1.5 text-xs font-mono"
+            className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs font-mono"
           />
           <div className="flex items-center gap-3">
             <input
@@ -218,7 +218,7 @@ export default function EvalLabPage() {
         </div>
       </section>
 
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
         <h2 className="font-medium text-gray-900 mb-3">2 · Run</h2>
         <div className="grid gap-3 text-sm">
           <label className="text-xs text-gray-500">
@@ -226,7 +226,7 @@ export default function EvalLabPage() {
             <select
               value={selectedDataset}
               onChange={(e) => setDatasetId(e.target.value)}
-              className="mt-1 block rounded-md border border-gray-200 px-2 py-1.5 text-sm"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-200 px-2 py-1.5 text-sm"
             >
               {(datasets.data ?? []).map((d) => (
                 <option key={d.id} value={d.id}>
@@ -303,7 +303,7 @@ export default function EvalLabPage() {
         </div>
       </section>
 
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-gray-900">3 · Runs</h2>
           <button
@@ -369,7 +369,7 @@ export default function EvalLabPage() {
       </section>
 
       {pickedRuns.length > 0 && (
-        <section className="bg-white rounded-xl border border-gray-200 p-5 overflow-x-auto">
+        <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 overflow-x-auto">
           <h2 className="font-medium text-gray-900 mb-3">Comparison</h2>
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">

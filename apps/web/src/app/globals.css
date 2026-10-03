@@ -56,6 +56,9 @@
   /* soft, diffuse elevation instead of hard drop shadows */
   --shadow-sm: 0 1px 3px rgba(112, 144, 176, 0.08);
   --shadow-lg: 0 4px 24px rgba(112, 144, 176, 0.12);
+  /* the wider diffuse glow used on primary content cards (chat, evidence panel,
+     and every card below) - kept as one token so the look stays in sync */
+  --shadow-glow: 0 0 40px 4px rgba(112, 144, 176, 0.2);
 }
 
 @theme inline {
@@ -71,6 +74,9 @@
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-border: var(--border);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-glow: var(--shadow-glow);
   --font-sans: var(--font-jakarta), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

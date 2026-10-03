@@ -2,6 +2,7 @@ import type { ChatMessage } from "@/hooks/useChat";
 import CitationChip from "@/components/chat/CitationChip";
 import AbstentionMessage from "@/components/chat/AbstentionMessage";
 import ChatAvatar from "@/components/chat/ChatAvatar";
+import UserAvatar from "@/components/chat/UserAvatar";
 
 function renderContentWithCitations(
   message: ChatMessage,
@@ -125,10 +126,11 @@ export default function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
+      <div className="flex items-start justify-end gap-2.5">
         <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
           {message.content}
         </div>
+        <UserAvatar size={32} />
       </div>
     );
   }

@@ -180,6 +180,11 @@ class ChatService:
                         else None
                     ),
                     "verification_status": rag_response.verification_status,
+                    "claim_verifications": [
+                        c.model_dump(mode="json") for c in rag_response.claim_verifications
+                    ],
+                    "conflicts": [c.model_dump(mode="json") for c in rag_response.conflicts],
+                    "evidence_gate": rag_response.evidence_gate.model_dump(mode="json"),
                 },
                 token_usage={
                     "prompt_tokens": rag_response.retrieval_metadata.get("prompt_tokens"),
@@ -290,9 +295,14 @@ class ChatService:
                     "verification_status": final_event.get("verification_status"),
                     "evidence_gate": final_event.get("evidence_gate"),
                     "conflicts": final_event.get("conflicts"),
+                    "claim_verifications": final_event.get("claim_verifications"),
                     "agent": final_event.get("agent"),
                     "trace_id": final_event.get("trace_id"),
                     "span_ms": final_event.get("span_ms"),
+                    "strategy": final_event.get("trace_stages", {}).get("meta", {}).get("strategy"),
+                    "answer_mode": final_event.get("trace_stages", {})
+                    .get("meta", {})
+                    .get("answer_mode"),
                     **(final_event.get("cost_metadata") or {}),
                 },
                 token_usage=final_event.get("cost_metadata"),

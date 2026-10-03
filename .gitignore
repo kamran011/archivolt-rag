@@ -40,3 +40,10 @@ htmlcov/
 
 # Misc
 *.log
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json

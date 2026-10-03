@@ -77,7 +77,7 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-bg-white rounded-2xl border border-border shadow-glow p-6 space-y-5">
         {submitError && (
           <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {submitError}

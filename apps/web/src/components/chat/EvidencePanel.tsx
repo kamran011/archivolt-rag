@@ -252,7 +252,11 @@ export default function EvidencePanel({
   const conflicts = message?.conflicts ?? [];
 
   return (
-    <aside aria-label="Evidence for the selected answer" className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-bg-white shadow-sm">
+    <aside
+      aria-label="Evidence for the selected answer"
+      className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-bg-white"
+      style={{ boxShadow: "0 0 40px 4px rgba(112, 144, 176, 0.2)" }}
+    >
       <div className="flex items-start gap-3 px-4 py-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-text">Evidence</h2>

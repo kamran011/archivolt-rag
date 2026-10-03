@@ -7,13 +7,24 @@ import type { UsageSummary } from "@/lib/types";
 
 const RANGES = [7, 30, 90];
 
+// Flat: these sit inside the stats card below, divided by a hairline rather
+// than each getting its own shadow.
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
+    <div className="p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="text-2xl font-semibold text-gray-900 mt-1">{value}</p>
       {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
+  );
+}
+
+function Panel({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-bg-white shadow-glow p-5">
+      {title && <h2 className="text-sm font-medium text-gray-900 mb-3">{title}</h2>}
+      {children}
+    </section>
   );
 }
 
@@ -62,7 +73,7 @@ export default function AnalyticsPage() {
   const maxStage = Math.max(1, ...stages.map(([, ms]) => ms));
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
@@ -82,7 +93,7 @@ export default function AnalyticsPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-12 text-center text-gray-400 text-sm">
           Loading…
         </div>
       ) : error ? (
@@ -90,7 +101,7 @@ export default function AnalyticsPage() {
           {error}
         </div>
       ) : data && data.total_answers === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-500 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-12 text-center text-gray-500 text-sm">
           No answers in the last {data.days} days.
         </div>
       ) : data ? (
@@ -100,23 +111,25 @@ export default function AnalyticsPage() {
               Showing the most recent 5,000 answers; older ones in this range are excluded.
             </p>
           )}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Stat label="Answers" value={data.total_answers.toLocaleString()} />
-            <Stat
-              label="Abstention rate"
-              value={pct(data.abstention_rate)}
-              hint={`${data.abstained} refused for lack of evidence`}
-            />
-            <Stat label="Total cost" value={usd(data.total_cost_usd)} hint={`avg ${usd(data.avg_cost_usd)} / answer`} />
-            <Stat
-              label="Avg citations"
-              value={data.avg_citations === null ? "-" : data.avg_citations.toFixed(1)}
-              hint={`${data.conflicts_flagged} answers flagged conflicts`}
-            />
-          </div>
 
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-medium text-gray-900 mb-4">Answers per day</h2>
+          <Panel>
+            <div className="grid grid-cols-2 divide-y divide-gray-100 lg:grid-cols-4 lg:divide-y-0 lg:divide-x">
+              <Stat label="Answers" value={data.total_answers.toLocaleString()} />
+              <Stat
+                label="Abstention rate"
+                value={pct(data.abstention_rate)}
+                hint={`${data.abstained} refused for lack of evidence`}
+              />
+              <Stat label="Total cost" value={usd(data.total_cost_usd)} hint={`avg ${usd(data.avg_cost_usd)} / answer`} />
+              <Stat
+                label="Avg citations"
+                value={data.avg_citations === null ? "-" : data.avg_citations.toFixed(1)}
+                hint={`${data.conflicts_flagged} answers flagged conflicts`}
+              />
+            </div>
+          </Panel>
+
+          <Panel title="Answers per day">
             <div className="flex items-end gap-1 h-32">
               {data.daily.map((d) => (
                 <div
@@ -135,11 +148,10 @@ export default function AnalyticsPage() {
               <span>{data.daily[0]?.date}</span>
               <span>{data.daily[data.daily.length - 1]?.date}</span>
             </div>
-          </section>
+          </Panel>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-medium text-gray-900 mb-3">Retrieval strategy</h2>
+            <Panel title="Retrieval strategy">
               <ul className="space-y-2 text-sm">
                 {Object.entries(data.strategy_counts).map(([name, n]) => (
                   <li key={name} className="flex justify-between">
@@ -153,11 +165,13 @@ export default function AnalyticsPage() {
                     <span className="font-mono">{data.agentic_answers}</span>
                   </li>
                 )}
+                {Object.keys(data.strategy_counts).length === 0 && data.agentic_answers === 0 && (
+                  <li className="text-gray-400">No retrieval runs recorded yet.</li>
+                )}
               </ul>
-            </section>
+            </Panel>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-medium text-gray-900 mb-3">Average stage latency</h2>
+            <Panel title="Average stage latency">
               {stages.length === 0 ? (
                 <p className="text-xs text-gray-400">No stage timings recorded yet.</p>
               ) : (
@@ -178,7 +192,7 @@ export default function AnalyticsPage() {
                   ))}
                 </ul>
               )}
-            </section>
+            </Panel>
           </div>
         </div>
       ) : null}

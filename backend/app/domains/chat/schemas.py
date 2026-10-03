@@ -41,6 +41,10 @@ class MessageResponse(BaseModel):
     citations: list | None
     abstained: bool
     created_at: datetime
+    # Trace/build metadata captured when the answer was generated (None for user
+    # messages, and for assistant messages saved before this field existed).
+    retrieval_metadata: dict | None = None
+    token_usage: dict | None = None
 
     model_config = {"from_attributes": True}
 

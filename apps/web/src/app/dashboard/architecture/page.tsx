@@ -37,9 +37,11 @@ const LAYERS: [string, string][] = [
   ["Evaluation", "datasets, strategy/mode matrix runs, leakage and injection metrics with zero tolerance"],
 ];
 
+// Flat by design: these sit inside one elevated section panel (see <Panel>),
+// so the tile itself only needs a hairline border, not its own shadow.
 function Box({ stage, n }: { stage: Stage; n: number }) {
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-3 text-sm">
+    <li className="rounded-xl border border-border p-3 text-sm">
       <p className="flex items-center gap-2 font-medium text-gray-900">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50 text-[11px] text-blue-700">
           {n}
@@ -61,10 +63,20 @@ function Box({ stage, n }: { stage: Stage; n: number }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-xl border border-border p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
     </div>
+  );
+}
+
+// Each section gets its own elevated card; this just wraps the label + body.
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-bg-white shadow-glow p-6">
+      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -81,8 +93,8 @@ export default function ArchitecturePage() {
   const u = usage.data;
 
   return (
-    <div className="max-w-5xl space-y-8">
-      <div>
+    <div>
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">How Archivolt works</h1>
         <p className="text-sm text-gray-500">
           The pipeline behind every answer, with the guard at each step — and live numbers from this
@@ -90,69 +102,67 @@ export default function ArchitecturePage() {
         </p>
       </div>
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">Live (last 30 days)</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Knowledge bases" value={String(knowledgeBases.length)} />
-          <Stat label="Documents" value={String(docs)} />
-          <Stat label="Answers" value={u ? String(u.total_answers) : "—"} />
-          <Stat
-            label="Abstention rate"
-            value={u?.abstention_rate != null ? `${(u.abstention_rate * 100).toFixed(1)}%` : "—"}
-          />
-          <Stat label="Avg cost / answer" value={u?.avg_cost_usd != null ? `$${u.avg_cost_usd.toFixed(4)}` : "—"} />
-          <Stat label="Avg citations" value={u?.avg_citations != null ? u.avg_citations.toFixed(1) : "—"} />
-          <Stat label="Conflicts flagged" value={u ? String(u.conflicts_flagged) : "—"} />
-          <Stat label="Deep-research answers" value={u ? String(u.agentic_answers) : "—"} />
-        </div>
-        {!isAdmin && (
-          <p className="mt-2 text-xs text-gray-400">Usage figures are visible to owners and admins.</p>
-        )}
-        {u && Object.keys(u.strategy_counts).length > 0 && (
-          <p className="mt-2 text-xs text-gray-500">
-            Strategies used:{" "}
-            {Object.entries(u.strategy_counts)
-              .map(([k, v]) => `${k} ×${v}`)
-              .join(" · ")}
-          </p>
-        )}
-      </section>
+      <div className="space-y-6">
+        <Panel title="Live (last 30 days)">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat label="Knowledge bases" value={String(knowledgeBases.length)} />
+            <Stat label="Documents" value={String(docs)} />
+            <Stat label="Answers" value={u ? String(u.total_answers) : "—"} />
+            <Stat
+              label="Abstention rate"
+              value={u?.abstention_rate != null ? `${(u.abstention_rate * 100).toFixed(1)}%` : "—"}
+            />
+            <Stat label="Avg cost / answer" value={u?.avg_cost_usd != null ? `$${u.avg_cost_usd.toFixed(4)}` : "—"} />
+            <Stat label="Avg citations" value={u?.avg_citations != null ? u.avg_citations.toFixed(1) : "—"} />
+            <Stat label="Conflicts flagged" value={u ? String(u.conflicts_flagged) : "—"} />
+            <Stat label="Deep-research answers" value={u ? String(u.agentic_answers) : "—"} />
+          </div>
+          {!isAdmin && (
+            <p className="mt-3 text-xs text-gray-400">Usage figures are visible to owners and admins.</p>
+          )}
+          {u && Object.keys(u.strategy_counts).length > 0 && (
+            <p className="mt-3 text-xs text-gray-500">
+              Strategies used:{" "}
+              {Object.entries(u.strategy_counts)
+                .map(([k, v]) => `${k} ×${v}`)
+                .join(" · ")}
+            </p>
+          )}
+        </Panel>
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">Ingestion</h2>
-        <ol className="grid gap-3 md:grid-cols-4">
-          {INGEST.map((s, i) => (
-            <Box key={s.name} stage={s} n={i + 1} />
-          ))}
-        </ol>
-      </section>
+        <Panel title="Ingestion">
+          <ol className="grid gap-3 md:grid-cols-4">
+            {INGEST.map((s, i) => (
+              <Box key={s.name} stage={s} n={i + 1} />
+            ))}
+          </ol>
+        </Panel>
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">Answering</h2>
-        <ol className="grid gap-3 md:grid-cols-3">
-          {ANSWER.map((s, i) => (
-            <Box key={s.name} stage={s} n={i + 1} />
-          ))}
-        </ol>
-      </section>
+        <Panel title="Answering">
+          <ol className="grid gap-3 md:grid-cols-3">
+            {ANSWER.map((s, i) => (
+              <Box key={s.name} stage={s} n={i + 1} />
+            ))}
+          </ol>
+        </Panel>
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">Safety layers</h2>
-        <dl className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
-          {LAYERS.map(([k, v]) => (
-            <div key={k} className="grid gap-1 px-4 py-3 text-sm md:grid-cols-[14rem_1fr]">
-              <dt className="font-medium text-gray-900">{k}</dt>
-              <dd className="text-gray-600">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+        <Panel title="Safety layers">
+          <dl className="divide-y divide-gray-100">
+            {LAYERS.map(([k, v]) => (
+              <div key={k} className="grid gap-1 py-3 text-sm first:pt-0 last:pb-0 md:grid-cols-[14rem_1fr]">
+                <dt className="font-medium text-gray-900">{k}</dt>
+                <dd className="text-gray-600">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Panel>
 
-      <p className="text-sm text-gray-500">
-        See it in action: <Link className="text-blue-600" href="/dashboard/debug">retrieval debugger</Link>,{" "}
-        <Link className="text-blue-600" href="/dashboard/analytics">analytics</Link>,{" "}
-        <Link className="text-blue-600" href="/dashboard/evals">evaluation lab</Link>.
-      </p>
+        <p className="text-sm text-gray-500">
+          See it in action: <Link className="text-blue-600" href="/dashboard/debug">retrieval debugger</Link>,{" "}
+          <Link className="text-blue-600" href="/dashboard/analytics">analytics</Link>,{" "}
+          <Link className="text-blue-600" href="/dashboard/evals">evaluation lab</Link>.
+        </p>
+      </div>
     </div>
   );
 }

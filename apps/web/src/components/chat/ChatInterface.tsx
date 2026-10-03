@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type { AnswerMode } from "@/lib/types";
@@ -24,7 +25,12 @@ function OptionChip({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ChatInterface() {
+export default function ChatInterface({
+  initialConversationId,
+}: {
+  initialConversationId?: string;
+}) {
+  const router = useRouter();
   const [selectedKbIds, setSelectedKbIds] = useState<string[]>([]);
   const [agentic, setAgentic] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
@@ -38,11 +44,27 @@ export default function ChatInterface() {
   const { currentOrg } = useOrganization();
   // Web search needs the deployment flag AND this opt-in; the server enforces both.
   const webSearchAllowed = currentOrg?.settings?.web_search_enabled === true;
-  const { messages, sendMessage, isStreaming, error } = useChat(selectedKbIds, {
-    agentic,
-    webSearch: webSearch && webSearchAllowed,
-    mode,
-  });
+  const { messages, sendMessage, isStreaming, error, conversationId, loading, restoredKbId } =
+    useChat(
+      selectedKbIds,
+      { agentic, webSearch: webSearch && webSearchAllowed, mode },
+      initialConversationId
+    );
+
+  // Reopening a past conversation: restore the KB it was scoped to instead of
+  // leaving the picker empty (which silently disables the send button).
+  useEffect(() => {
+    if (restoredKbId) setSelectedKbIds((prev) => (prev.length === 0 ? [restoredKbId] : prev));
+  }, [restoredKbId]);
+
+  // After the first reply in a new conversation, update the URL so a refresh restores it.
+  const pushedRef = useRef<string | null>(initialConversationId ?? null);
+  useEffect(() => {
+    if (conversationId && conversationId !== pushedRef.current) {
+      pushedRef.current = conversationId;
+      router.replace(`/dashboard/chat/${conversationId}`);
+    }
+  }, [conversationId, router]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -99,7 +121,17 @@ export default function ChatInterface() {
         </div>
 
         <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          {messages.length === 0 ? (
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center gap-2 text-text-muted">
+                <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-sm">Loading conversation…</span>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center">
               <div>
                 <svg
