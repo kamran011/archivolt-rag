@@ -37,6 +37,21 @@ BILLING = [f"Billing sentence {i} covers invoices and refunds." for i in range(1
 SHIPPING = [f"Shipping sentence {i} covers carriers and delivery." for i in range(12)]
 
 
+def _topic_budget() -> int:
+    """A chunk budget that fits one 12-sentence topic (with its heading prefix) but not
+    both. Derived from the chunker's real tokenizer so the tests don't depend on how many
+    tokens a sentence happens to be."""
+    c = StructureAwareChunker()
+    prefix = "# Policies\n\n"
+    one = c.count_tokens(prefix + " ".join(BILLING))
+    both = c.count_tokens(prefix + " ".join(BILLING + SHIPPING))
+    assert one + 10 < both
+    return one + 10
+
+
+TOPIC_BUDGET = _topic_budget()
+
+
 async def topic_embed(texts: list[str]) -> list[list[float]]:
     return [[1.0, 0.0] if "Billing" in t else [0.0, 1.0] for t in texts]
 
@@ -99,14 +114,14 @@ def long_section_doc():
 
 @pytest.mark.asyncio
 async def test_semantic_chunker_splits_the_oversized_section_at_the_topic_boundary():
-    chunks = await SemanticChunker(topic_embed).achunk(long_section_doc(), 100, 10)
+    chunks = await SemanticChunker(topic_embed).achunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert len(chunks) == 2
     assert "Billing sentence 0" in chunks[0].content and "Shipping" not in chunks[0].content
     assert "Shipping sentence 0" in chunks[1].content and "Billing" not in chunks[1].content
     assert all(c.metadata.get("semantic_split") for c in chunks)
     assert all(c.metadata["heading_hierarchy"] == ["Policies"] for c in chunks)
     assert all(c.content.startswith("# Policies") for c in chunks)  # keeps heading context
-    assert all(c.token_count <= 100 + 10 for c in chunks)
+    assert all(c.token_count <= TOPIC_BUDGET + 10 for c in chunks)
     assert [c.chunk_index for c in chunks] == [0, 1]
 
 
@@ -129,7 +144,7 @@ async def test_semantic_chunker_falls_back_to_fixed_when_embedding_fails():
     async def boom(texts):
         raise RuntimeError("embedding provider down")
 
-    chunks = await SemanticChunker(boom).achunk(long_section_doc(), 100, 10)
+    chunks = await SemanticChunker(boom).achunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert len(chunks) >= 2  # still chunked (fixed), ingestion not failed
     assert not any(c.metadata.get("semantic_split") for c in chunks)
 
@@ -144,14 +159,14 @@ async def test_semantic_chunker_tables_and_headings_keep_structure_behaviour():
 @pytest.mark.asyncio
 async def test_semantic_chunker_tracks_embedding_tokens_for_cost():
     chunker = SemanticChunker(topic_embed)
-    await chunker.achunk(long_section_doc(), 100, 10)
+    await chunker.achunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert chunker.embedding_tokens > 0
 
 
 @pytest.mark.asyncio
 async def test_sync_chunk_still_works_like_structure_aware():
-    sync = SemanticChunker(topic_embed).chunk(long_section_doc(), 100, 10)
-    ref = StructureAwareChunker().chunk(long_section_doc(), 100, 10)
+    sync = SemanticChunker(topic_embed).chunk(long_section_doc(), TOPIC_BUDGET, 10)
+    ref = StructureAwareChunker().chunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert [c.content for c in sync] == [c.content for c in ref]
 
 
@@ -175,7 +190,7 @@ class ScriptedLLM:
 async def test_agentic_chunker_uses_llm_chosen_boundaries():
     llm = ScriptedLLM(json.dumps({"breaks": [12]}))
     chunker = AgenticChunker(llm)
-    chunks = await chunker.achunk(long_section_doc(), 100, 10)
+    chunks = await chunker.achunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert len(chunks) == 2
     assert "Billing sentence 11" in chunks[0].content and "Shipping" not in chunks[0].content
     assert all(c.metadata.get("agentic_split") for c in chunks)
@@ -188,7 +203,7 @@ async def test_agentic_chunker_uses_llm_chosen_boundaries():
     "reply", ["garbage", '{"breaks": [999]}', '{"breaks": "x"}', RuntimeError("llm down")]
 )
 async def test_agentic_chunker_falls_back_on_bad_or_failed_llm_output(reply):
-    chunks = await AgenticChunker(ScriptedLLM(reply)).achunk(long_section_doc(), 100, 10)
+    chunks = await AgenticChunker(ScriptedLLM(reply)).achunk(long_section_doc(), TOPIC_BUDGET, 10)
     assert len(chunks) >= 2
     assert not any(c.metadata.get("agentic_split") for c in chunks)
 
