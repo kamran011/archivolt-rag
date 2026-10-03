@@ -8,7 +8,9 @@ import type {
   AnswerMode,
   AgentSummary,
   Citation,
+  ClaimVerification,
   ConflictInfo,
+  CostMetadata,
   EvidenceGateResult,
   MessageRole,
   VerificationStatus,
@@ -25,6 +27,14 @@ export interface ChatMessage {
   evidenceGate?: EvidenceGateResult;
   conflicts?: ConflictInfo[];
   agent?: AgentSummary;
+  claims?: ClaimVerification[];
+  cost?: CostMetadata;
+  traceId?: string;
+  spanMs?: Record<string, number | null>;
+  strategy?: string;
+  answerMode?: string;
+  /** The user question this answer responds to (shown in the evidence panel). */
+  question?: string;
   streaming?: boolean;
 }
 
@@ -59,6 +69,7 @@ export function useChat(
         id: assistantId,
         role: "assistant",
         content: "",
+        question: content,
         streaming: true,
       };
 
@@ -97,6 +108,12 @@ export function useChat(
                       evidenceGate: event.evidence_gate,
                       conflicts: event.conflicts,
                       agent: event.agent,
+                      claims: event.claim_verifications,
+                      cost: event.cost_metadata,
+                      traceId: event.trace_id,
+                      spanMs: event.span_ms,
+                      strategy: event.trace_stages?.meta?.strategy,
+                      answerMode: event.trace_stages?.meta?.answer_mode,
                     }
                   : m
               )

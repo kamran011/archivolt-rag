@@ -8,7 +8,14 @@ import type { Citation } from "@/lib/types";
 const POPOVER_WIDTH = 288;
 const MARGIN = 8;
 
-export default function CitationChip({ citation }: { citation: Citation }) {
+export default function CitationChip({
+  citation,
+  onOpen,
+}: {
+  citation: Citation;
+  /** Called when the chip is opened, e.g. to highlight the source in the evidence panel. */
+  onOpen?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -60,6 +67,7 @@ export default function CitationChip({ citation }: { citation: Citation }) {
       <button
         ref={buttonRef}
         onClick={() => {
+          if (!open) onOpen?.();
           setOpen(!open);
           setPos(null);
         }}

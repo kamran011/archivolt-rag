@@ -373,3 +373,28 @@ export interface MetricDelta {
   delta: number;
   regressed: boolean;
 }
+
+// --- Evidence panel ---
+
+export type ClaimStatus = "supported" | "partial" | "unsupported";
+
+export interface ClaimVerification {
+  claim: string;
+  supported: boolean;
+  supporting_sources: number[];
+  confidence: number;
+  status: ClaimStatus;
+}
+
+export interface CostMetadata {
+  estimated_prompt_tokens: number;
+  estimated_completion_tokens: number;
+  estimated_cost_usd: number;
+  token_count_method: string;
+}
+
+export interface TraceMeta {
+  strategy?: string;
+  answer_mode?: string;
+  total_ms?: number;
+}

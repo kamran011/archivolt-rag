@@ -4,8 +4,11 @@ import type {
   AnswerMode,
   AgentSummary,
   Citation,
+  ClaimVerification,
   ConflictInfo,
+  CostMetadata,
   EvidenceGateResult,
+  TraceMeta,
   VerificationStatus,
 } from "@/lib/types";
 
@@ -21,7 +24,11 @@ export interface ChatStreamEvent {
   // Set when verification changed the answer after it was streamed; replaces the shown text.
   final_answer?: string | null;
   citations?: Citation[];
-  claim_verifications?: unknown[];
+  claim_verifications?: ClaimVerification[];
+  cost_metadata?: CostMetadata;
+  trace_id?: string;
+  span_ms?: Record<string, number | null>;
+  trace_stages?: { meta?: TraceMeta };
   conflicts?: ConflictInfo[];
   agent?: AgentSummary;
   evidence_gate?: EvidenceGateResult;
