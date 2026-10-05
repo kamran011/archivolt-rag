@@ -2,39 +2,39 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 
-class GroundtruthError(Exception):
+class RagixError(Exception):
     pass
 
 
-class NotFoundError(GroundtruthError):
+class NotFoundError(RagixError):
     pass
 
 
-class ForbiddenError(GroundtruthError):
+class ForbiddenError(RagixError):
     pass
 
 
-class UnauthorizedError(GroundtruthError):
+class UnauthorizedError(RagixError):
     pass
 
 
-class ValidationError(GroundtruthError):
+class ValidationError(RagixError):
     pass
 
 
-class InsufficientEvidenceError(GroundtruthError):
+class InsufficientEvidenceError(RagixError):
     pass
 
 
-class IngestionError(GroundtruthError):
+class IngestionError(RagixError):
     pass
 
 
-class StorageError(GroundtruthError):
+class StorageError(RagixError):
     pass
 
 
-class ProviderError(GroundtruthError):
+class ProviderError(RagixError):
     """An upstream LLM/embedding provider call failed. The message is safe to show to users:
     provider error bodies can quote parts of the API key, so build it with
     `provider_error()` rather than interpolating the raw exception."""
@@ -66,13 +66,13 @@ def provider_error(provider: str, operation: str, exc: BaseException) -> Provide
     return ProviderError(f"{provider} {operation} failed: {reason}")
 
 
-class RateLimitError(GroundtruthError):
+class RateLimitError(RagixError):
     def __init__(self, message: str = "Rate limit exceeded", retry_after: int = 1) -> None:
         super().__init__(message)
         self.retry_after = max(1, int(retry_after))
 
 
-class BudgetExceededError(GroundtruthError):
+class BudgetExceededError(RagixError):
     """The organization has used its daily LLM budget."""
 
 

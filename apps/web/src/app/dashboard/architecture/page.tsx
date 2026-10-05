@@ -95,7 +95,7 @@ export default function ArchitecturePage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">How Groundtruth works</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">How Ragix works</h1>
         <p className="text-sm text-gray-500">
           The pipeline behind every answer, with the guard at each step — and live numbers from this
           organization.

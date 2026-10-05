@@ -17,7 +17,7 @@ interface OrganizationContextValue {
 
 const OrganizationContext = createContext<OrganizationContextValue | null>(null);
 
-const STORAGE_KEY = "groundtruth_current_org_id";
+const STORAGE_KEY = "ragix_current_org_id";
 
 function slugify(base: string): string {
   const cleaned = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

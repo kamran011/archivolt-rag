@@ -145,7 +145,7 @@ export default function Sidebar({
             <circle cx="14" cy="14" r="9.5" stroke="var(--primary)" strokeWidth="2" opacity="0.55" />
             <circle cx="14" cy="14" r="13" stroke="var(--primary)" strokeWidth="1.6" opacity="0.3" />
           </svg>
-          <span className="text-lg font-bold text-gray-900 tracking-tight flex-1">Groundtruth</span>
+          <span className="text-lg font-bold text-gray-900 tracking-tight flex-1">Ragix</span>
           <button
             type="button"
             aria-label="Close navigation"

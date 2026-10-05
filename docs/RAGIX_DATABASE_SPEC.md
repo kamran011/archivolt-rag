@@ -1,4 +1,4 @@
-# Groundtruth Database Specification
+# Ragix Database Specification
 
 > **Status: DERIVED (interim)**
 > No authoritative spec has been supplied yet. The schema in

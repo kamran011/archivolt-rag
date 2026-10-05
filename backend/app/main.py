@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Groundtruth API",
+    title="Ragix API",
     version="0.1.0",
     description="AI Knowledge & Evidence Platform",
     lifespan=lifespan,

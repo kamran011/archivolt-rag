@@ -1,4 +1,4 @@
-# Groundtruth — AI Knowledge & Evidence Platform
+# Ragix — AI Knowledge & Evidence Platform
 
 Production-grade RAG system that retrieves the right evidence, respects permissions, optimizes context, and verifies answers before they reach users.
 
@@ -26,7 +26,7 @@ Production-grade RAG system that retrieves the right evidence, respects permissi
    # or
    supabase start && supabase db reset   # local
    ```
-   The schema is defined in `docs/GROUNDTRUTH_DATABASE_SPEC.md` and migrations are in `supabase/migrations/`.
+   The schema is defined in `docs/RAGIX_DATABASE_SPEC.md` and migrations are in `supabase/migrations/`.
 
 3. **Install and run backend**
    ```bash
@@ -47,7 +47,7 @@ Production-grade RAG system that retrieves the right evidence, respects permissi
 ## Repository Structure
 
 ```
-groundtruth/
+ragix/
 ├── apps/web/           Next.js frontend (TypeScript + Tailwind)
 ├── backend/            FastAPI backend (Python)
 │   └── app/
@@ -61,8 +61,8 @@ groundtruth/
 
 ## Documentation
 
-- [Architecture](docs/GROUNDTRUTH_ARCHITECTURE.md)
-- [Database Specification](docs/GROUNDTRUTH_DATABASE_SPEC.md) *(implementation pending)*
+- [Architecture](docs/RAGIX_ARCHITECTURE.md)
+- [Database Specification](docs/RAGIX_DATABASE_SPEC.md) *(implementation pending)*
 - [API Docs](http://localhost:8000/docs) *(when running)*
 
 ## Implementation Phases

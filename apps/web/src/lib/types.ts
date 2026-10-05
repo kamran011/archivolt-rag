@@ -1,7 +1,7 @@
 /**
  * TypeScript interfaces matching the FastAPI backend Pydantic response models.
  * These will be expanded as each backend domain is built.
- * Aligned with docs/GROUNDTRUTH_DATABASE_SPEC.md.
+ * Aligned with docs/RAGIX_DATABASE_SPEC.md.
  */
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

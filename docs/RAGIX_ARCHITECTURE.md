@@ -1,8 +1,8 @@
-# Groundtruth Architecture
+# Ragix Architecture
 
 ## System Overview
 
-Groundtruth is a production-grade AI Knowledge & Evidence Platform built around a principled RAG pipeline:
+Ragix is a production-grade AI Knowledge & Evidence Platform built around a principled RAG pipeline:
 
 ```
 SOURCE
@@ -51,7 +51,7 @@ CITATIONS / ABSTENTION
 ## Repository Structure
 
 ```
-groundtruth/
+ragix/
 ├── apps/
 │   └── web/                 ← Next.js frontend
 ├── backend/                 ← Python/FastAPI backend
@@ -66,8 +66,8 @@ groundtruth/
 │   ├── seed.sql
 │   └── config.toml
 └── docs/
-    ├── GROUNDTRUTH_DATABASE_SPEC.md
-    └── GROUNDTRUTH_ARCHITECTURE.md
+    ├── RAGIX_DATABASE_SPEC.md
+    └── RAGIX_ARCHITECTURE.md
 ```
 
 ## Implementation Phases
