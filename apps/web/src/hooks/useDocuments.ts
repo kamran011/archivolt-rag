@@ -1,9 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
-import type { Document, DocumentUpdate } from "@/lib/types";
+import type { Document, DocumentStatus, DocumentUpdate } from "@/lib/types";
+
+// Ingestion runs in a background job (pending -> parsing -> chunking ->
+// embedding -> ready|failed); these are the non-terminal states worth
+// polling for, so a freshly-uploaded document's status updates on its own
+// instead of requiring a manual page refresh.
+const IN_PROGRESS: DocumentStatus[] = ["pending", "parsing", "chunking", "embedding"];
 
 export function useDocuments(kbId: string) {
   const { currentOrg } = useOrganization();
@@ -13,6 +20,13 @@ export function useDocuments(kbId: string) {
     "Failed to load documents",
   );
   const documents = data ?? [];
+
+  const hasInProgress = documents.some((d) => IN_PROGRESS.includes(d.status));
+  useEffect(() => {
+    if (!hasInProgress) return;
+    const t = setInterval(() => void refresh(), 3000);
+    return () => clearInterval(t);
+  }, [hasInProgress, refresh]);
 
   async function uploadDocument(file: File): Promise<Document> {
     if (!currentOrg) throw new Error("No organization selected");
