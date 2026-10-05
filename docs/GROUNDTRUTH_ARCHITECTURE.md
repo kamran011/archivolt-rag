@@ -1,8 +1,8 @@
-# Archivolt Architecture
+# Groundtruth Architecture
 
 ## System Overview
 
-Archivolt is a production-grade AI Knowledge & Evidence Platform built around a principled RAG pipeline:
+Groundtruth is a production-grade AI Knowledge & Evidence Platform built around a principled RAG pipeline:
 
 ```
 SOURCE
@@ -51,7 +51,7 @@ CITATIONS / ABSTENTION
 ## Repository Structure
 
 ```
-archivolt/
+groundtruth/
 ├── apps/
 │   └── web/                 ← Next.js frontend
 ├── backend/                 ← Python/FastAPI backend
@@ -66,8 +66,8 @@ archivolt/
 │   ├── seed.sql
 │   └── config.toml
 └── docs/
-    ├── ARCHIVOLT_DATABASE_SPEC.md
-    └── ARCHIVOLT_ARCHITECTURE.md
+    ├── GROUNDTRUTH_DATABASE_SPEC.md
+    └── GROUNDTRUTH_ARCHITECTURE.md
 ```
 
 ## Implementation Phases

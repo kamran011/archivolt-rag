@@ -2,39 +2,39 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 
-class ArchivoltError(Exception):
+class GroundtruthError(Exception):
     pass
 
 
-class NotFoundError(ArchivoltError):
+class NotFoundError(GroundtruthError):
     pass
 
 
-class ForbiddenError(ArchivoltError):
+class ForbiddenError(GroundtruthError):
     pass
 
 
-class UnauthorizedError(ArchivoltError):
+class UnauthorizedError(GroundtruthError):
     pass
 
 
-class ValidationError(ArchivoltError):
+class ValidationError(GroundtruthError):
     pass
 
 
-class InsufficientEvidenceError(ArchivoltError):
+class InsufficientEvidenceError(GroundtruthError):
     pass
 
 
-class IngestionError(ArchivoltError):
+class IngestionError(GroundtruthError):
     pass
 
 
-class StorageError(ArchivoltError):
+class StorageError(GroundtruthError):
     pass
 
 
-class ProviderError(ArchivoltError):
+class ProviderError(GroundtruthError):
     """An upstream LLM/embedding provider call failed. The message is safe to show to users:
     provider error bodies can quote parts of the API key, so build it with
     `provider_error()` rather than interpolating the raw exception."""
@@ -66,13 +66,13 @@ def provider_error(provider: str, operation: str, exc: BaseException) -> Provide
     return ProviderError(f"{provider} {operation} failed: {reason}")
 
 
-class RateLimitError(ArchivoltError):
+class RateLimitError(GroundtruthError):
     def __init__(self, message: str = "Rate limit exceeded", retry_after: int = 1) -> None:
         super().__init__(message)
         self.retry_after = max(1, int(retry_after))
 
 
-class BudgetExceededError(ArchivoltError):
+class BudgetExceededError(GroundtruthError):
     """The organization has used its daily LLM budget."""
 
 

@@ -2,7 +2,7 @@
 SQLAlchemy ORM model base classes.
 
 These models are application-layer interfaces. Column definitions will be
-aligned with docs/ARCHIVOLT_DATABASE_SPEC.md when the schema is finalized.
+aligned with docs/GROUNDTRUTH_DATABASE_SPEC.md when the schema is finalized.
 Supabase manages the actual database migrations via supabase/migrations/.
 """
 

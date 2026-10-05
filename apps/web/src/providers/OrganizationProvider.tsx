@@ -15,7 +15,7 @@ interface OrganizationContextValue {
 
 const OrganizationContext = createContext<OrganizationContextValue | null>(null);
 
-const STORAGE_KEY = "archivolt_current_org_id";
+const STORAGE_KEY = "groundtruth_current_org_id";
 
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
   const { data, loading, error, refresh } = useApiResource<Organization[]>(

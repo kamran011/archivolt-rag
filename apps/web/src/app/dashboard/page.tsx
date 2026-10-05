@@ -5,7 +5,7 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-1">Dashboard</h1>
       <p className="text-gray-500 text-sm mb-8">
-        Welcome to Archivolt — your AI knowledge platform.
+        Welcome to Groundtruth — your AI knowledge platform.
       </p>
 
       <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-5 mb-6">

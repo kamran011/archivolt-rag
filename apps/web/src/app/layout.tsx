@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Archivolt — AI Knowledge Platform",
+  title: "Groundtruth — AI Knowledge Platform",
   description:
     "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
 };

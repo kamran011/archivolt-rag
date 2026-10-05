@@ -100,7 +100,7 @@ export default function ChatInterface({
         <div className="flex items-center gap-3 px-5 py-3">
           <ChatAvatar size={36} />
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-text">Archivolt Assistant</h2>
+            <h2 className="text-sm font-semibold text-text">Groundtruth Assistant</h2>
             <div className="mt-0.5 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-secondary" />
               <span className="text-xs text-secondary">Online</span>

@@ -1,4 +1,4 @@
-# Archivolt — AI Knowledge & Evidence Platform
+# Groundtruth — AI Knowledge & Evidence Platform
 
 Production-grade RAG system that retrieves the right evidence, respects permissions, optimizes context, and verifies answers before they reach users.
 
@@ -26,7 +26,7 @@ Production-grade RAG system that retrieves the right evidence, respects permissi
    # or
    supabase start && supabase db reset   # local
    ```
-   The schema is defined in `docs/ARCHIVOLT_DATABASE_SPEC.md` and migrations are in `supabase/migrations/`.
+   The schema is defined in `docs/GROUNDTRUTH_DATABASE_SPEC.md` and migrations are in `supabase/migrations/`.
 
 3. **Install and run backend**
    ```bash
@@ -47,7 +47,7 @@ Production-grade RAG system that retrieves the right evidence, respects permissi
 ## Repository Structure
 
 ```
-archivolt/
+groundtruth/
 ├── apps/web/           Next.js frontend (TypeScript + Tailwind)
 ├── backend/            FastAPI backend (Python)
 │   └── app/
@@ -61,8 +61,8 @@ archivolt/
 
 ## Documentation
 
-- [Architecture](docs/ARCHIVOLT_ARCHITECTURE.md)
-- [Database Specification](docs/ARCHIVOLT_DATABASE_SPEC.md) *(implementation pending)*
+- [Architecture](docs/GROUNDTRUTH_ARCHITECTURE.md)
+- [Database Specification](docs/GROUNDTRUTH_DATABASE_SPEC.md) *(implementation pending)*
 - [API Docs](http://localhost:8000/docs) *(when running)*
 
 ## Implementation Phases

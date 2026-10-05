@@ -1,6 +1,6 @@
-# Archivolt Master Roadmap
+# Groundtruth Master Roadmap
 
-This is the canonical, versioned roadmap for Archivolt. It exists so that
+This is the canonical, versioned roadmap for Groundtruth. It exists so that
 implementation work (by Claude Code, Cursor, or anyone else) always knows
 what belongs in the current version, what must be preserved as an extension
 point for a later version, and what should explicitly **not** be built yet.
@@ -227,7 +227,7 @@ the ingestion pipeline.
 **Redis/infra at production scale:**
 
 ```
-                    ARCHIVOLT
+                    GROUNDTRUTH
                         |
               +---------+---------+
               v                   v

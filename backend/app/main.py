@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Archivolt API",
+    title="Groundtruth API",
     version="0.1.0",
     description="AI Knowledge & Evidence Platform",
     lifespan=lifespan,

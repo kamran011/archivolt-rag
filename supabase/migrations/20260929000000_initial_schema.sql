@@ -1,7 +1,7 @@
--- Archivolt initial schema.
+-- Groundtruth initial schema.
 --
 -- DERIVED FROM the SQLAlchemy models in backend/app/models/ (the authoritative
--- DB spec, docs/ARCHIVOLT_DATABASE_SPEC.md, is still pending). If that spec
+-- DB spec, docs/GROUNDTRUTH_DATABASE_SPEC.md, is still pending). If that spec
 -- differs, add a follow-up migration rather than editing this one.
 --
 -- Enum type names match SQLAlchemy's default naming so the ORM works unchanged.
