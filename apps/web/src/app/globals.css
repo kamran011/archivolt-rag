@@ -13,7 +13,10 @@
   --primary-tint: #f2efff;
   --secondary: #10b981;
   --cta: #6a35ff;
-  --bg: #fcfcfc;
+  /* Distinct from --bg-white on purpose: cards are pure white and should
+     visibly float on this, not blend into it (flat cards rely on this
+     contrast now that most screens no longer use a shadow). */
+  --bg: #f4f5f8;
   --bg-white: #fff;
   --text: #1b2559;
   --text-muted: #718096;

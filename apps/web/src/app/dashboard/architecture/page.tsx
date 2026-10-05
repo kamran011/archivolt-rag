@@ -41,7 +41,7 @@ const LAYERS: [string, string][] = [
 // so the tile itself only needs a hairline border, not its own shadow.
 function Box({ stage, n }: { stage: Stage; n: number }) {
   return (
-    <li className="rounded-xl border border-border p-3 text-sm">
+    <li className="rounded-xl border border-border bg-bg p-3 text-sm">
       <p className="flex items-center gap-2 font-medium text-gray-900">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50 text-[11px] text-blue-700">
           {n}
@@ -63,7 +63,7 @@ function Box({ stage, n }: { stage: Stage; n: number }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className="rounded-xl border border-border bg-bg p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
     </div>

@@ -287,7 +287,7 @@ function Chunks({ base, orgId }: { base: string; orgId: string | undefined }) {
             | { strategy: string; chunk_size: number; chunk_overlap: number }
             | undefined;
           return (
-            <article key={c.id} className="rounded-xl border border-border p-4">
+            <article key={c.id} className="rounded-xl border border-border bg-bg p-4">
               <header className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
                 <span className="font-medium text-gray-800">#{c.chunk_index}</span>
                 <span>{c.token_count} tokens</span>
@@ -378,7 +378,7 @@ function Summaries({ base, orgId }: { base: string; orgId: string | undefined })
   return (
     <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
       {items.map((i) => (
-        <article key={`${i.level}-${i.node_id ?? "doc"}`} className="rounded-xl border border-border p-4">
+        <article key={`${i.level}-${i.node_id ?? "doc"}`} className="rounded-xl border border-border bg-bg p-4">
           <p className="text-xs uppercase text-gray-400 mb-1">{i.level}</p>
           <h3 className="text-sm font-medium text-gray-900">{i.title}</h3>
           <p className="text-sm text-gray-600 mt-1">{i.summary}</p>

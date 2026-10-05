@@ -55,7 +55,7 @@ function ChunkRow({ chunk, rank }: { chunk: DebugChunk; rank: number }) {
 function StageCard({ stage }: { stage: DebugStage }) {
   const [open, setOpen] = useState(stage.chunks.length <= 10);
   return (
-    <section className="rounded-xl border border-border overflow-hidden">
+    <section className="rounded-xl border border-border bg-bg overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary"

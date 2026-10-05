@@ -76,7 +76,7 @@ export default function KnowledgeBasesPage() {
               <Link
                 key={kb.id}
                 href={`/dashboard/knowledge-bases/${kb.id}`}
-                className="rounded-xl border border-border p-4 transition-colors hover:bg-gray-50"
+                className="rounded-xl border border-border bg-bg p-4 transition-colors hover:bg-white hover:border-primary/30"
               >
                 <h3 className="font-medium text-gray-900">{kb.name}</h3>
                 {kb.description && (
