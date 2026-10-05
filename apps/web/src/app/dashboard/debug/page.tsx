@@ -120,7 +120,7 @@ export default function RetrievalDebuggerPage() {
         generated.
       </p>
 
-      <form onSubmit={run} className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 space-y-4">
+      <form onSubmit={run} className="bg-bg-white rounded-2xl border border-border p-5 space-y-4">
         <div>
           <label className="text-xs font-medium text-gray-500">Question</label>
           <input
@@ -167,7 +167,7 @@ export default function RetrievalDebuggerPage() {
 
       {result && (
         <div className="mt-6 space-y-3">
-          <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-4 text-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-bg-white rounded-2xl border border-border p-4 text-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p className="text-xs text-gray-500">Route</p>
               <p className="font-medium text-gray-900">{result.route.strategy}</p>
@@ -196,7 +196,7 @@ export default function RetrievalDebuggerPage() {
             </div>
           </div>
           {result.stages.length > 0 && (
-            <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-4 space-y-3">
+            <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
               {result.stages.map((s, i) => (
                 <StageCard key={`${s.name}-${i}`} stage={s} />
               ))}

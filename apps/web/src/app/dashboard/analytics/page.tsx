@@ -21,7 +21,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 
 function Panel({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-bg-white shadow-glow p-5">
+    <section className="rounded-2xl border border-border bg-bg-white p-5">
       {title && <h2 className="text-sm font-medium text-gray-900 mb-3">{title}</h2>}
       {children}
     </section>
@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
       </div>
 
       {loading ? (
-        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-12 text-center text-gray-400 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border p-12 text-center text-gray-400 text-sm">
           Loading…
         </div>
       ) : error ? (
@@ -101,7 +101,7 @@ export default function AnalyticsPage() {
           {error}
         </div>
       ) : data && data.total_answers === 0 ? (
-        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-12 text-center text-gray-500 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border p-12 text-center text-gray-500 text-sm">
           No answers in the last {data.days} days.
         </div>
       ) : data ? (

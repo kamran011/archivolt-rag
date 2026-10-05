@@ -73,7 +73,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // Each section gets its own elevated card; this just wraps the label + body.
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-bg-white shadow-glow p-6">
+    <section className="rounded-2xl border border-border bg-bg-white p-6">
       <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-500">{title}</h2>
       {children}
     </section>

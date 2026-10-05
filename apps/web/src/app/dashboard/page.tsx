@@ -8,7 +8,7 @@ export default function DashboardPage() {
         Welcome to Ragix — your AI knowledge platform.
       </p>
 
-      <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-5 mb-6">
+      <div className="rounded-2xl border border-border bg-bg-white p-5 mb-6">
         <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {[
             { label: "Knowledge Bases", value: "—", href: "/dashboard/knowledge-bases" },
@@ -37,9 +37,9 @@ export default function DashboardPage() {
           </li>
           <li>Upload documents (PDF, DOCX, Markdown, TXT)</li>
           <li>
-            <a href="/dashboard/chat" className="underline">
+            <Link href="/dashboard/chat" className="underline">
               Start chatting
-            </a>{" "}
+            </Link>{" "}
             with your documents
           </li>
         </ol>

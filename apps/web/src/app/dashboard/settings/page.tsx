@@ -62,7 +62,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 mb-6">
+      <section className="bg-bg-white rounded-2xl border border-border p-5 mb-6">
         <h2 className="font-medium text-gray-900 mb-1">Web search</h2>
         <p className="text-sm text-gray-500 mb-3">
           Lets members ask the assistant to supplement the knowledge base with public web results.
@@ -92,7 +92,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
+      <section className="bg-bg-white rounded-2xl border border-border p-5">
         <h2 className="font-medium text-gray-900 mb-3">Members</h2>
         {loadError && <p className="text-sm text-red-600 mb-2">{loadError}</p>}
         {loading ? (

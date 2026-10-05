@@ -66,7 +66,7 @@ export default function KnowledgeBaseDetailPage({
         </p>
       )}
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-6 mb-8">
+      <section className="bg-bg-white rounded-2xl border border-border p-6 mb-8">
         <label className="flex items-start gap-3 text-sm">
           <input
             type="checkbox"
@@ -107,11 +107,11 @@ export default function KnowledgeBaseDetailPage({
       {loading ? (
         <div className="text-gray-400 text-sm text-center py-8">Loading documents…</div>
       ) : documents.length === 0 ? (
-        <div className="bg-bg-white rounded-2xl border border-border shadow-glow p-10 text-center text-gray-500 text-sm">
+        <div className="bg-bg-white rounded-2xl border border-border p-10 text-center text-gray-500 text-sm">
           No documents uploaded yet.
         </div>
       ) : (
-        <div className="bg-bg-white rounded-2xl border border-border shadow-glow overflow-hidden">
+        <div className="bg-bg-white rounded-2xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>

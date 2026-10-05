@@ -167,7 +167,7 @@ export default function EvalLabPage() {
         </div>
       )}
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
+      <section className="bg-bg-white rounded-2xl border border-border p-5">
         <h2 className="font-medium text-gray-900 mb-2">1 · Dataset</h2>
         <p className="text-xs text-gray-500 mb-3">
           JSONL, one case per line: <code>id</code>, <code>question</code>,{" "}
@@ -218,7 +218,7 @@ export default function EvalLabPage() {
         </div>
       </section>
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
+      <section className="bg-bg-white rounded-2xl border border-border p-5">
         <h2 className="font-medium text-gray-900 mb-3">2 · Run</h2>
         <div className="grid gap-3 text-sm">
           <label className="text-xs text-gray-500">
@@ -303,7 +303,7 @@ export default function EvalLabPage() {
         </div>
       </section>
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5">
+      <section className="bg-bg-white rounded-2xl border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-gray-900">3 · Runs</h2>
           <button
@@ -369,7 +369,7 @@ export default function EvalLabPage() {
       </section>
 
       {pickedRuns.length > 0 && (
-        <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 overflow-x-auto">
+        <section className="bg-bg-white rounded-2xl border border-border p-5 overflow-x-auto">
           <h2 className="font-medium text-gray-900 mb-3">Comparison</h2>
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">

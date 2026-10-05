@@ -152,7 +152,7 @@ function Overview({
 
   return (
     <div className="grid gap-5 md:grid-cols-2">
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 text-sm space-y-3">
+      <section className="bg-bg-white rounded-2xl border border-border p-5 text-sm space-y-3">
         <h2 className="font-medium text-gray-900">Metadata</h2>
         <dl className="grid grid-cols-[8rem_1fr] gap-y-1 text-gray-600">
           <dt>File</dt>
@@ -171,7 +171,7 @@ function Overview({
         {doc.error_message && <p className="text-red-600 text-xs">{doc.error_message}</p>}
       </section>
 
-      <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 text-sm space-y-3">
+      <section className="bg-bg-white rounded-2xl border border-border p-5 text-sm space-y-3">
         <h2 className="font-medium text-gray-900">Governance</h2>
         <label className="block text-xs text-gray-500">
           Authority
@@ -231,7 +231,7 @@ function Overview({
       </section>
 
       {canManage && doc.restricted && (
-        <section className="bg-bg-white rounded-2xl border border-border shadow-glow p-5 text-sm md:col-span-2">
+        <section className="bg-bg-white rounded-2xl border border-border p-5 text-sm md:col-span-2">
           <h2 className="font-medium text-gray-900 mb-2">Who can read this document</h2>
           {access.error && <p className="text-xs text-red-600">{access.error}</p>}
           <ul className="divide-y divide-gray-100 mb-3">
@@ -280,7 +280,7 @@ function Chunks({ base, orgId }: { base: string; orgId: string | undefined }) {
     <div>
       {page.error && <p className="text-sm text-red-600 mb-2">{page.error}</p>}
       {page.loading && <p className="text-sm text-gray-400">Loading…</p>}
-      <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-4 space-y-3">
+      <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
         {(page.data?.items ?? []).map((c) => {
           const flags = (c.metadata.injection_risk_flags as string[] | undefined) ?? [];
           const chunking = c.metadata.chunking as
@@ -361,7 +361,7 @@ function Outline({ base, orgId }: { base: string; orgId: string | undefined }) {
     return <p className="text-sm text-gray-500">This document has no heading outline.</p>;
   }
   return (
-    <ul className="bg-bg-white rounded-2xl border border-border shadow-glow p-4">
+    <ul className="bg-bg-white rounded-2xl border border-border p-4">
       {nodes.map((n) => (
         <NodeView key={n.node_id} node={n} />
       ))}
@@ -376,7 +376,7 @@ function Summaries({ base, orgId }: { base: string; orgId: string | undefined })
   const items = s.data?.items ?? [];
   if (items.length === 0) return <p className="text-sm text-gray-500">No summaries were generated.</p>;
   return (
-    <div className="rounded-2xl border border-border bg-bg-white shadow-glow p-4 space-y-3">
+    <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
       {items.map((i) => (
         <article key={`${i.level}-${i.node_id ?? "doc"}`} className="rounded-xl border border-border p-4">
           <p className="text-xs uppercase text-gray-400 mb-1">{i.level}</p>
@@ -403,7 +403,7 @@ function Versions({
   if (v.error) return <p className="text-sm text-red-600">{v.error}</p>;
   if (v.loading) return <p className="text-sm text-gray-400">Loading…</p>;
   return (
-    <ul className="bg-bg-white rounded-2xl border border-border shadow-glow divide-y divide-gray-100">
+    <ul className="bg-bg-white rounded-2xl border border-border divide-y divide-gray-100">
       {(v.data ?? []).map((d) => (
         <li key={d.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
           <span>
