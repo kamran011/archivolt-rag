@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import DocumentStatusBadge from "@/components/documents/DocumentStatusBadge";
+import BackLink from "@/components/ui/BackLink";
 import type {
   AuthorityTier,
   ChunkPage,
@@ -42,13 +43,8 @@ export default function DocumentInspectorPage({
 
   return (
     <div>
-      <Link
-        href={`/dashboard/knowledge-bases/${kbId}`}
-        className="text-sm text-gray-500 hover:text-gray-900"
-      >
-        ← Documents
-      </Link>
-      <div className="mt-2 mb-4 flex items-center gap-3">
+      <BackLink href={`/dashboard/knowledge-bases/${kbId}`} label="Documents" />
+      <div className="mb-4 flex items-center gap-3">
         <h1 className="text-2xl font-semibold text-gray-900">{doc.data?.title ?? "Document"}</h1>
         {doc.data && <DocumentStatusBadge status={doc.data.status} />}
       </div>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { ApiError } from "@/lib/api";
+import BackLink from "@/components/ui/BackLink";
 
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(200),
@@ -69,10 +70,8 @@ export default function NewKnowledgeBasePage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
-        <Link href="/dashboard/knowledge-bases" className="text-sm text-gray-500 hover:text-gray-900">
-          ← Knowledge Bases
-        </Link>
-        <h1 className="text-2xl font-semibold text-gray-900 mt-2">New Knowledge Base</h1>
+        <BackLink href="/dashboard/knowledge-bases" label="Knowledge Bases" />
+        <h1 className="text-2xl font-semibold text-gray-900">New Knowledge Base</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-bg-white rounded-2xl border border-border shadow-glow p-6 space-y-5">

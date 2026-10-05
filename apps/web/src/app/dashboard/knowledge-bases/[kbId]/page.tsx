@@ -9,6 +9,7 @@ import { useOrganization } from "@/providers/OrganizationProvider";
 import type { CagInfo, KnowledgeBase } from "@/lib/types";
 import DocumentStatusBadge from "@/components/documents/DocumentStatusBadge";
 import DocumentUploader from "@/components/documents/DocumentUploader";
+import BackLink from "@/components/ui/BackLink";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -55,11 +56,9 @@ export default function KnowledgeBaseDetailPage({
 
   return (
     <div>
-      <Link href="/dashboard/knowledge-bases" className="text-sm text-gray-500 hover:text-gray-900">
-        ← Knowledge Bases
-      </Link>
+      <BackLink href="/dashboard/knowledge-bases" label="Knowledge Bases" />
 
-      <h1 className="text-2xl font-semibold text-gray-900 mt-2 mb-1">{kb?.name ?? "Documents"}</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 mb-1">{kb?.name ?? "Documents"}</h1>
       {kb && (
         <p className="text-xs text-gray-500 mb-6">
           {kb.chunk_strategy.replace("_", "-")} chunking · {kb.chunk_size} tokens ·{" "}
