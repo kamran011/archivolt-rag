@@ -147,6 +147,12 @@ interfaces stay abstract — no Redis dependency.
 - Cost-aware model routing
 - Incremental, content-hash-based re-embedding (detect which chunks
   actually changed instead of re-embedding the whole document)
+- Corpus-level near-duplicate document detection at ingestion — confirmed
+  gap (audited 2026-10-08): `evidence.py`'s Jaccard dedup only runs at
+  query time on already-retrieved chunks. Nothing detects "this new
+  upload is 90% the same content as an existing document" at ingestion
+  time, so the same paragraph can sit indexed under several documents and
+  silently compete/contradict at query time
 
 **Prerequisite before this version starts:** extract `DecisionProvider` as
 an ABC (`Rules`, `LLM`, and a `Jev` implementation) so sufficiency/routing
@@ -177,6 +183,19 @@ optimization on top of it.
 - Rate limiting
 - Short-lived agent state
 - Distributed locks where needed
+
+**Caching must be correctness-safe, not just a TTL.** A naive "cache by
+embedding similarity above a threshold" or "cache for N minutes" design
+will confidently serve stale/wrong answers — this bit someone in a recent
+interview-question breakdown, worth designing against explicitly:
+- Invalidate on write, not on a timer: keep a reverse index from
+  `document_id` → every cached answer that cited it, so a `create_new_version()`
+  call evicts every dependent cache entry immediately, not after a TTL
+  expires
+- TTL (when used at all) should scale with the data's volatility, not be
+  one global number
+- Verify-on-hit: a cheap check that a cache hit's cited source versions
+  still match the current ones before serving it, not just on write
 
 ```
 User Query
@@ -238,6 +257,24 @@ Embedding cache
   granularity, not sub-chunk strips
 - **New gap found in this audit:** formal memory/retention guardrails
   (session data lifecycle, retention limits) — not found in the codebase
+- **New gap found in this audit:** answer reproducibility/audit trail is
+  partial. `RagTrace` ([observability/store.py](backend/app/domains/observability/store.py))
+  already records chunk IDs, scores, model name, cost, tokens and
+  per-stage drop reasons (`rag/stages.py`'s `brief()`, deliberately IDs
+  and reasons, not chunk text) — solid for debugging. What's missing for
+  a compliance-grade "reproduce this exact answer" request: `DEFAULT_LLM_MODEL`
+  is a floating alias (`"gpt-4o"`, [config.py:58](backend/app/config.py:58)),
+  not a dated/pinned snapshot, so the trace records which alias was used
+  but not which underlying model version actually ran; and there's no
+  prompt-template version/hash stored per trace, so a later prompt edit
+  makes historical traces ambiguous about exactly what was sent
+- **New gap found in this audit:** action-tiering + human-approval
+  workflow for agent tool calls. Not a current bug — `domains/agent/retrieval_agent.py`'s
+  tool set is deliberately read-only (search/outline/read_section/finish),
+  so there is nothing irreversible to approve today. But there's no
+  reversibility/blast-radius tiering framework in place, so the first
+  write-capable tool added (e.g. an ERP/CRM action in V4) would need this
+  built from scratch rather than slotting into an existing policy layer
 
 **Redis for agentic workloads:**
 - Agent state/cache
@@ -282,6 +319,13 @@ Agent
 - Slack/Teams-style channels
 - n8n/workflow integrations
 - More ERP/LMS/CRM connectors
+- Self-hosted/open-weight LLM option (vLLM + Llama/Mistral or similar) for
+  air-gapped or regulated deployments — confirmed gap (audited 2026-10-08):
+  `providers/llm/` only has `openai_provider.py` and `anthropic_provider.py`;
+  `base.py` is already an ABC with a registry, so this is a new provider
+  file + registry entry, not a call-site change, but "no third-party AI
+  provider reachable" scenarios (banking/healthcare RFPs) can't be met
+  today
 
 **Prerequisite before this version starts:** extract `KnowledgeConnector` as
 an ABC (`Upload`, `Website`, `S3`, `External APIs` already; `Google Drive`,
@@ -329,7 +373,14 @@ something like SQS rather than defaulting to Redis for everything.
 - Speculative generation where appropriate
 - Retrieval strategy A/B testing
 - Automated evaluation datasets
-- Regression testing
+- Regression testing — specifically: run the golden eval set automatically
+  whenever the LLM/embedding provider updates its default model, and
+  canary-compare old-vs-new output distributions on a traffic slice before
+  promoting, instead of only evaluating at launch/upload time. Confirmed
+  gap (audited 2026-10-08): the eval harness (`backend/app/evals/`) exists
+  and can run datasets on demand, but nothing triggers it on a schedule or
+  on a provider-side model change — drift (provider or corpus) would only
+  surface from a user complaint, not a metric
 - Production observability
 - Large-scale indexing/performance
 - Enterprise reliability/scaling
