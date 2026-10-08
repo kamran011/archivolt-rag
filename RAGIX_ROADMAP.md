@@ -130,21 +130,6 @@ interfaces stay abstract — no Redis dependency.
 - Query rewriting
 - Multi-query
 - Sub-query decomposition
-- Query routing
-- Retrieval strategy routing
-- Parent/child retrieval
-- Hierarchical summaries
-- RAPTOR-style retrieval
-- PageIndex-style/tree reasoning
-- Adaptive retrieval
-- Iterative retrieval
-- SQL/structured-data retrieval foundation
-- External API/application-data retrieval
-- Jev DecisionProvider
-- Rules / LLM / Jev decision providers
-- Evidence sufficiency decisions
-- Retrieval/relevance scoring
-- Cost-aware model routing
 - Incremental, content-hash-based re-embedding (detect which chunks
   actually changed instead of re-embedding the whole document)
 - Corpus-level near-duplicate document detection at ingestion — confirmed
@@ -153,6 +138,21 @@ interfaces stay abstract — no Redis dependency.
   upload is 90% the same content as an existing document" at ingestion
   time, so the same paragraph can sit indexed under several documents and
   silently compete/contradict at query time
+- Adaptive retrieval
+- Iterative retrieval
+- Query routing
+- Retrieval strategy routing
+- Retrieval/relevance scoring
+- Evidence sufficiency decisions
+- Cost-aware model routing
+- Jev DecisionProvider
+- Rules / LLM / Jev decision providers
+- Parent/child retrieval
+- Hierarchical summaries
+- RAPTOR-style retrieval
+- PageIndex-style/tree reasoning
+- SQL/structured-data retrieval foundation
+- External API/application-data retrieval
 
 **Prerequisite before this version starts:** extract `DecisionProvider` as
 an ABC (`Rules`, `LLM`, and a `Jev` implementation) so sufficiency/routing
@@ -225,36 +225,27 @@ Embedding cache
 
 ## V3 — Corrective + Agentic RAG
 
+- ~~Evidence grading~~ — **built** (`evidence_gate.py` + `sufficiency.py`)
 - ~~CRAG-style retrieval correction~~ — **built**: evidence gate +
   sufficiency check triggers a web-search fallback before abstaining (see
   "Current state" above)
-- Self-RAG-style reflection
-- ~~Evidence grading~~ — **built** (`evidence_gate.py` + `sufficiency.py`)
 - ~~Claim extraction~~ — **built** (`claim_verifier.py`)
 - ~~Claim-to-evidence verification~~ — **built** (`claim_verifier.py`)
 - ~~Answer verification~~ — **built** (`claim_verifier.py`, drives
   rewrite-or-abstain)
 - ~~Conflict resolution~~ — **built** (`conflict_detector.py` /
   `conflict_resolver.py`)
-- ~~Freshness/version precedence~~ — **built** (`create_new_version()` +
-  `sufficiency.py`'s `wants_current` check)
-- Multi-hop retrieval — bounded single-hop expansion exists
-  (`retrieval/expansion.py`); true multi-hop chaining does not yet
-- ~~Agentic retrieval~~ — **built** (`domains/agent/retrieval_agent.py`)
-- ~~Bounded agent loops~~ — **built** (max steps, token budget, timeout,
-  no-progress cutoff)
-- ~~Agent planning~~ — **built** (planner prompt + closed action space)
-- ~~Tool selection~~ — **built**
-- ~~Tool execution controls~~ — **built** (`tools/base.py`
-  `ToolRegistry`/`ToolExecutor`, per-call audit)
-- Human escalation
-- Agent workflow/report generation
 - ~~Prompt-injection defenses (baseline)~~ — **built**
   (`security/prompt_injection.py`); *deepened* defenses still open
-- More comprehensive security testing
-- **New gap found in this audit:** fine-grained knowledge-strip
-  decomposition/recombination — correction today operates at chunk
-  granularity, not sub-chunk strips
+- ~~Tool execution controls~~ — **built** (`tools/base.py`
+  `ToolRegistry`/`ToolExecutor`, per-call audit)
+- ~~Bounded agent loops~~ — **built** (max steps, token budget, timeout,
+  no-progress cutoff)
+- ~~Agentic retrieval~~ — **built** (`domains/agent/retrieval_agent.py`)
+- ~~Agent planning~~ — **built** (planner prompt + closed action space)
+- ~~Tool selection~~ — **built**
+- ~~Freshness/version precedence~~ — **built** (`create_new_version()` +
+  `sufficiency.py`'s `wants_current` check)
 - **New gap found in this audit:** formal memory/retention guardrails
   (session data lifecycle, retention limits) — not found in the codebase
 - **New gap found in this audit:** answer reproducibility/audit trail is
@@ -275,6 +266,15 @@ Embedding cache
   reversibility/blast-radius tiering framework in place, so the first
   write-capable tool added (e.g. an ERP/CRM action in V4) would need this
   built from scratch rather than slotting into an existing policy layer
+- More comprehensive security testing
+- Multi-hop retrieval — bounded single-hop expansion exists
+  (`retrieval/expansion.py`); true multi-hop chaining does not yet
+- Self-RAG-style reflection
+- **New gap found in this audit:** fine-grained knowledge-strip
+  decomposition/recombination — correction today operates at chunk
+  granularity, not sub-chunk strips
+- Human escalation
+- Agent workflow/report generation
 
 **Redis for agentic workloads:**
 - Agent state/cache
@@ -301,24 +301,6 @@ Agent
 
 ## V4 — Enterprise Retrieval & Integrations
 
-- GraphRAG
-- Knowledge graphs
-- Multimodal RAG
-- PDF page/image/table understanding
-- OCR
-- SQL retrieval
-- Web retrieval
-- Cross-lingual retrieval
-- CAG for suitable stable knowledge bases
-- Google Drive
-- Dropbox
-- SharePoint/other enterprise sources
-- S3/web connectors
-- Website ingestion
-- WhatsApp/Twilio
-- Slack/Teams-style channels
-- n8n/workflow integrations
-- More ERP/LMS/CRM connectors
 - Self-hosted/open-weight LLM option (vLLM + Llama/Mistral or similar) for
   air-gapped or regulated deployments — confirmed gap (audited 2026-10-08):
   `providers/llm/` only has `openai_provider.py` and `anthropic_provider.py`;
@@ -326,6 +308,24 @@ Agent
   file + registry entry, not a call-site change, but "no third-party AI
   provider reachable" scenarios (banking/healthcare RFPs) can't be met
   today
+- PDF page/image/table understanding
+- OCR
+- Multimodal RAG
+- SQL retrieval
+- Google Drive
+- SharePoint/other enterprise sources
+- Dropbox
+- S3/web connectors
+- Website ingestion
+- Web retrieval
+- CAG for suitable stable knowledge bases
+- Knowledge graphs
+- GraphRAG
+- Cross-lingual retrieval
+- More ERP/LMS/CRM connectors
+- Slack/Teams-style channels
+- WhatsApp/Twilio
+- n8n/workflow integrations
 
 **Prerequisite before this version starts:** extract `KnowledgeConnector` as
 an ABC (`Upload`, `Website`, `S3`, `External APIs` already; `Google Drive`,
@@ -357,22 +357,6 @@ something like SQS rather than defaulting to Redis for everything.
 
 ## V5 — Optimization, Evaluation & Scale
 
-- Embedding benchmarking
-- Reranker benchmarking
-- Recall@K
-- Precision@K
-- MRR
-- NDCG
-- Answer accuracy
-- Faithfulness/groundedness
-- Retrieval-vs-answer evaluation
-- Latency benchmarking
-- Token/cost optimization
-- Caching (mature)
-- Model routing
-- Speculative generation where appropriate
-- Retrieval strategy A/B testing
-- Automated evaluation datasets
 - Regression testing — specifically: run the golden eval set automatically
   whenever the LLM/embedding provider updates its default model, and
   canary-compare old-vs-new output distributions on a traffic slice before
@@ -382,8 +366,24 @@ something like SQS rather than defaulting to Redis for everything.
   on a provider-side model change — drift (provider or corpus) would only
   surface from a user complaint, not a metric
 - Production observability
+- Faithfulness/groundedness
+- Answer accuracy
+- Retrieval-vs-answer evaluation
+- Automated evaluation datasets
+- Recall@K
+- Precision@K
+- MRR
+- NDCG
+- Retrieval strategy A/B testing
 - Large-scale indexing/performance
 - Enterprise reliability/scaling
+- Latency benchmarking
+- Token/cost optimization
+- Caching (mature)
+- Model routing
+- Embedding benchmarking
+- Reranker benchmarking
+- Speculative generation where appropriate
 
 ---
 
