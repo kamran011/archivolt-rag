@@ -145,10 +145,28 @@ interfaces stay abstract — no Redis dependency.
 - Evidence sufficiency decisions
 - Retrieval/relevance scoring
 - Cost-aware model routing
+- Incremental, content-hash-based re-embedding (detect which chunks
+  actually changed instead of re-embedding the whole document)
 
 **Prerequisite before this version starts:** extract `DecisionProvider` as
 an ABC (`Rules`, `LLM`, and a `Jev` implementation) so sufficiency/routing
 decisions are pluggable instead of hardcoded.
+
+**Freshness: correctness is done, efficiency is not (confirmed gap,
+audited 2026-10-08).** V1's `documents/service.py` `create_new_version()`
+already guarantees no stale answers: an edited document becomes a new
+version, goes through the full pipeline, and the old version is excluded
+from retrieval by default. What it does *not* do is cheap: every edit
+re-parses, re-chunks, and re-embeds the entire document, even if only one
+paragraph changed, and there's no stable per-section chunk ID to upsert
+against. There's also no webhook/CDC ingestion trigger (V1 is upload-only)
+or index-lag/freshness-SLA tracking. V2 closes this by adding, per chunk:
+a content hash (skip re-embedding unchanged chunks), a stable chunk ID
+(so an edit upserts its own vectors instead of the whole document's), and
+an index-lag metric. This is additive to `create_new_version()`, not a
+replacement — document-level versioning stays the source of truth for
+"what does the reader see," chunk-hash diffing is purely an embedding-cost
+optimization on top of it.
 
 **Redis introduced here**, where it provides measurable value:
 - RAG response/query caching
@@ -374,6 +392,7 @@ KnowledgeConnector           (abstracted: documents/connectors/)
 | Webhook processing | Integrations | V4 |
 | API rate limiting | Already partially built (per-user limits) | V1 (basic), Redis-backed in V2 |
 | Usage/cost tracking | Already built (usage ledger) | V1 |
+| Content-hash chunk diffing | Skip re-embedding unchanged chunks on document edit | V2 |
 
 **Guiding rule:** V1 stays on Postgres + pgvector + FastAPI + Next.js +
 Supabase. Redis, workers/queues, and heavier observability get introduced
