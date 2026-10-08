@@ -20,10 +20,10 @@ const INGEST: Stage[] = [
 ];
 
 const ANSWER: Stage[] = [
-  { name: "Analyze", what: "Intent, entities, evidence requirements" },
-  { name: "Retrieve", what: "Semantic · keyword · hybrid (RRF) · tree · summary", guard: "tenant + document ACL inside the SQL" },
+  { name: "Analyze", what: "Intent, entities, evidence requirements, route strategy" },
+  { name: "Retrieve", what: "Semantic · keyword · hybrid (RRF) · tree · summary · optional bounded agent (multi-step tool use for deep-research answers)", guard: "tenant + document ACL inside the SQL" },
   { name: "Rerank & filter", what: "Cross-encoder/LLM rerank, stale, authority, dedupe, per-document cap" },
-  { name: "Gates", what: "Evidence + sufficiency gates, bounded expansion ladder", guard: "weak evidence → expand, then abstain" },
+  { name: "Gates", what: "Evidence + sufficiency gates, bounded expansion ladder", guard: "weak evidence → web-search correction (opt-in) → expand, then abstain" },
   { name: "Generate", what: "Grounded prompt: sources are untrusted data, token-budgeted", guard: "RAG · CAG · hybrid; optional web (labelled external)" },
   { name: "Verify", what: "Claim-by-claim check, conflicts, citations", guard: "unsupported → removed or abstain" },
   { name: "Trace", what: "Stage-by-stage trace, usage ledger, tool audit" },
@@ -33,8 +33,20 @@ const LAYERS: [string, string][] = [
   ["Tenant isolation", "organization is derived from membership, never from request input; every query filters on it; RLS as a second layer"],
   ["Permission-aware retrieval", "restricted documents + explicit grants resolved in SQL on every path (search, tree, summaries, neighbours, agent, CAG, tools)"],
   ["Prompt-injection defence", "documents are evidence, not instructions; the verifier rejects claims the sources do not support; tools are an allow-list with audit"],
+  ["Freshness", "an edited document becomes a new version and is re-embedded fresh; the superseded version is excluded from retrieval by default but stays queryable for historical questions"],
   ["Cost control", "per-org rate limits and daily LLM budget, ledger of every metered call"],
   ["Evaluation", "datasets, strategy/mode matrix runs, leakage and injection metrics with zero tolerance"],
+];
+
+// Confirmed open items from the 2026-10-08 roadmap audit (see RAGIX_ROADMAP.md) —
+// shown here deliberately, not just in the repo, so this page stays honest about
+// what's built vs. still planned.
+const GAPS: [string, string][] = [
+  ["Incremental re-embedding", "an edited document is re-embedded in full today; only the chunks that actually changed should need it"],
+  ["Corpus-level dedup", "near-duplicate chunks are filtered at query time; nothing yet catches the same content indexed twice under different documents"],
+  ["Self-hosted LLM option", "generation runs on OpenAI/Anthropic; no open-weight/air-gapped provider for regulated deployments yet"],
+  ["Answer reproducibility", "traces record the model alias and cited chunk IDs, not a pinned model snapshot or prompt-template version"],
+  ["Scheduled regression evals", "the evaluation harness runs on demand; nothing re-triggers it automatically when a provider updates its default model"],
 ];
 
 // Flat by design: these sit inside one elevated section panel (see <Panel>),
@@ -149,6 +161,17 @@ export default function ArchitecturePage() {
         <Panel title="Safety layers">
           <dl className="divide-y divide-gray-100">
             {LAYERS.map(([k, v]) => (
+              <div key={k} className="grid gap-1 py-3 text-sm first:pt-0 last:pb-0 md:grid-cols-[14rem_1fr]">
+                <dt className="font-medium text-gray-900">{k}</dt>
+                <dd className="text-gray-600">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Panel>
+
+        <Panel title="On the roadmap">
+          <dl className="divide-y divide-gray-100">
+            {GAPS.map(([k, v]) => (
               <div key={k} className="grid gap-1 py-3 text-sm first:pt-0 last:pb-0 md:grid-cols-[14rem_1fr]">
                 <dt className="font-medium text-gray-900">{k}</dt>
                 <dd className="text-gray-600">{v}</dd>
