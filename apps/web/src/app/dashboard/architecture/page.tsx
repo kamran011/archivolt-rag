@@ -104,6 +104,11 @@ export default function ArchitecturePage() {
   const docs = knowledgeBases.reduce((n, kb) => n + kb.document_count, 0);
   const u = usage.data;
 
+  if (!currentOrg) return <p className="text-sm text-gray-500">No organization selected.</p>;
+  if (!isAdmin) {
+    return <p className="text-sm text-gray-500">This page is available to owners and admins.</p>;
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -129,9 +134,6 @@ export default function ArchitecturePage() {
             <Stat label="Conflicts flagged" value={u ? String(u.conflicts_flagged) : "—"} />
             <Stat label="Deep-research answers" value={u ? String(u.agentic_answers) : "—"} />
           </div>
-          {!isAdmin && (
-            <p className="mt-3 text-xs text-gray-400">Usage figures are visible to owners and admins.</p>
-          )}
           {u && Object.keys(u.strategy_counts).length > 0 && (
             <p className="mt-3 text-xs text-gray-500">
               Strategies used:{" "}

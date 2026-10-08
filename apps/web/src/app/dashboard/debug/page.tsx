@@ -86,6 +86,7 @@ export default function RetrievalDebuggerPage() {
   const [result, setResult] = useState<DebugResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -110,6 +111,13 @@ export default function RetrievalDebuggerPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!currentOrg) return <p className="text-sm text-gray-500">No organization selected.</p>;
+  if (!isAdmin) {
+    return (
+      <p className="text-sm text-gray-500">The retrieval debugger is available to owners and admins.</p>
+    );
   }
 
   return (

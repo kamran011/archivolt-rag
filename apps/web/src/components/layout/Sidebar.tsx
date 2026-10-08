@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useConversations } from "@/hooks/useConversations";
+import { useOrganization } from "@/providers/OrganizationProvider";
 
 const NAV_ITEMS = [
   {
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   {
     label: "Retrieval Debugger",
     href: "/dashboard/debug",
+    adminOnly: true,
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -45,6 +47,7 @@ const NAV_ITEMS = [
   {
     label: "Evaluation Lab",
     href: "/dashboard/evals",
+    adminOnly: true,
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -54,6 +57,7 @@ const NAV_ITEMS = [
   {
     label: "Architecture",
     href: "/dashboard/architecture",
+    adminOnly: true,
     icon: (
       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
@@ -84,7 +88,7 @@ const NEW_CHAT_ICON = (
   </svg>
 );
 
-type NavItem = { label: string; href: string; icon: React.ReactNode };
+type NavItem = { label: string; href: string; icon: React.ReactNode; adminOnly?: boolean };
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
@@ -115,6 +119,9 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { conversations } = useConversations();
+  const { currentOrg } = useOrganization();
+  const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
+  const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   const chatActive = pathname.startsWith("/dashboard/chat");
 
@@ -160,7 +167,7 @@ export default function Sidebar({
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {/* Nav items above Chat */}
-          {NAV_ITEMS.slice(0, 2).map((item) => {
+          {navItems.slice(0, 2).map((item) => {
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -222,7 +229,7 @@ export default function Sidebar({
           </div>
 
           {/* Remaining nav items */}
-          {NAV_ITEMS.slice(2).map((item) => {
+          {navItems.slice(2).map((item) => {
             const active = pathname.startsWith(item.href);
             return <NavLink key={item.href} item={item} active={active} />;
           })}
