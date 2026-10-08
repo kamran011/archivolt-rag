@@ -25,13 +25,45 @@ V1 is implemented and running. A direct audit of `backend/app/domains/` and
 - Evidence sufficiency decisions (`retrieval/sufficiency.py`)
 - Bounded iterative/expansion retrieval (`retrieval/expansion.py`)
 
-Some V3 items are also partially live: claim extraction/verification and
-conflict detection exist in `domains/rag/`, and there's an agent-tools
-framework with authorization, limits, and audit (`domains/agents/` or
-equivalent) — ahead of the strict V1→V2→V3 ordering below. Treat the version
-labels as the *target architecture a feature belongs to*, not a strict
-claim about what's unbuilt; this doc should be re-audited whenever a new
-phase starts.
+**Most of V3 is also already implemented** (re-audited 2026-10-08 against
+the actual retrieval/rag/agent code, not just the plan):
+- Evidence grading — `retrieval/evidence_gate.py` (score threshold) +
+  `retrieval/sufficiency.py` (term coverage, freshness/authority-aware)
+- CRAG-style retrieval correction — when the gate/sufficiency check fails,
+  `rag/service.py`'s web-search fallback executor runs before the system
+  abstains (gated behind user request + org opt-in)
+- Claim extraction, claim-to-evidence verification, answer verification —
+  `rag/claim_verifier.py` (supported/partial/unsupported, drives
+  rewrite-or-abstain)
+- Conflict resolution — `rag/conflict_detector.py` / `conflict_resolver.py`
+- Freshness/version precedence — `documents/service.py`'s
+  `create_new_version()` (new version re-embedded fresh through the normal
+  pipeline, old version excluded from retrieval by default but still
+  queryable via `include_superseded`) + `sufficiency.py`'s `wants_current`
+  check
+- Agentic retrieval, bounded agent loops, agent planning, tool selection —
+  `domains/agent/retrieval_agent.py`: closed tool set, max steps, planner
+  token budget, wall-clock timeout, no-repeat-queries, no-progress cutoff
+- Tool execution controls — `domains/tools/base.py`
+  (`ToolRegistry`/`ToolExecutor`, closed action space, per-call audit)
+- Prompt-injection defenses (baseline) — `security/prompt_injection.py`
+
+**Still genuinely open from V3** (confirmed gaps, not just unaudited):
+- Fine-grained knowledge-strip decomposition/recombination — today's
+  correction operates at chunk granularity, not sub-chunk strips
+- Self-RAG-style reflection
+- True multi-hop retrieval (beyond the bounded single-hop expansion in
+  `retrieval/expansion.py`)
+- Human escalation
+- Agent workflow/report generation
+- Prompt-injection defenses *deepened*, and more comprehensive security
+  testing generally
+- Formal memory/retention guardrails (session data lifecycle, retention
+  limits) — not found anywhere in the codebase
+
+Treat the version labels as the *target architecture a feature belongs to*,
+not a strict claim about what's unbuilt; this doc should be re-audited
+whenever a new phase starts.
 
 **Gaps against the extension-point rule — now closed:**
 1. ~~No `DecisionProvider` abstraction~~ — **closed.**
@@ -156,24 +188,38 @@ Embedding cache
 
 ## V3 — Corrective + Agentic RAG
 
-- CRAG-style retrieval correction
+- ~~CRAG-style retrieval correction~~ — **built**: evidence gate +
+  sufficiency check triggers a web-search fallback before abstaining (see
+  "Current state" above)
 - Self-RAG-style reflection
-- Evidence grading
-- Claim extraction
-- Claim-to-evidence verification
-- Answer verification
-- Conflict resolution
-- Freshness/version precedence
-- Multi-hop retrieval
-- Agentic retrieval
-- Bounded agent loops
-- Agent planning
-- Tool selection
-- Tool execution controls
+- ~~Evidence grading~~ — **built** (`evidence_gate.py` + `sufficiency.py`)
+- ~~Claim extraction~~ — **built** (`claim_verifier.py`)
+- ~~Claim-to-evidence verification~~ — **built** (`claim_verifier.py`)
+- ~~Answer verification~~ — **built** (`claim_verifier.py`, drives
+  rewrite-or-abstain)
+- ~~Conflict resolution~~ — **built** (`conflict_detector.py` /
+  `conflict_resolver.py`)
+- ~~Freshness/version precedence~~ — **built** (`create_new_version()` +
+  `sufficiency.py`'s `wants_current` check)
+- Multi-hop retrieval — bounded single-hop expansion exists
+  (`retrieval/expansion.py`); true multi-hop chaining does not yet
+- ~~Agentic retrieval~~ — **built** (`domains/agent/retrieval_agent.py`)
+- ~~Bounded agent loops~~ — **built** (max steps, token budget, timeout,
+  no-progress cutoff)
+- ~~Agent planning~~ — **built** (planner prompt + closed action space)
+- ~~Tool selection~~ — **built**
+- ~~Tool execution controls~~ — **built** (`tools/base.py`
+  `ToolRegistry`/`ToolExecutor`, per-call audit)
 - Human escalation
 - Agent workflow/report generation
-- Prompt-injection defenses (deepened)
+- ~~Prompt-injection defenses (baseline)~~ — **built**
+  (`security/prompt_injection.py`); *deepened* defenses still open
 - More comprehensive security testing
+- **New gap found in this audit:** fine-grained knowledge-strip
+  decomposition/recombination — correction today operates at chunk
+  granularity, not sub-chunk strips
+- **New gap found in this audit:** formal memory/retention guardrails
+  (session data lifecycle, retention limits) — not found in the codebase
 
 **Redis for agentic workloads:**
 - Agent state/cache
