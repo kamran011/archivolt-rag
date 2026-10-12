@@ -41,6 +41,9 @@ htmlcov/
 # Misc
 *.log
 
+# Eval reports (generated artefacts, not source)
+backend/evals/reports/
+
 # Supabase CLI local state
 supabase/.branches/
 supabase/.temp/

@@ -1,0 +1,30 @@
+# V2 eval dataset — requires the corpus in evals/corpus/ to be uploaded to a KB.
+# Categories: single (regression), followup (history-bearing), comparison (multi-part), abstain.
+# Run: uv run python -m app.evals.cli run --dataset evals/datasets/v2.jsonl --org <id> --kb <id> --output evals/reports/baseline.json
+
+# --- Single-turn lookups (regression guard) ---
+{"id": "refund-window", "question": "How many days do customers have to request a refund?", "gold_documents": ["Refund Policy"], "gold_passages": ["30 days"], "expected_keywords": ["30 days"], "tags": ["single", "factual"]}
+{"id": "digital-refund", "question": "Are digital downloads refundable?", "gold_documents": ["Refund Policy"], "gold_passages": ["non-refundable"], "expected_keywords": ["non-refundable"], "tags": ["single", "factual"]}
+{"id": "free-shipping-threshold", "question": "What order total qualifies for free shipping?", "gold_documents": ["Shipping Policy"], "gold_passages": ["$50"], "expected_keywords": ["50"], "tags": ["single", "factual"]}
+{"id": "annual-plan-trial-refund", "question": "How long do I have to cancel an annual plan and get a full refund?", "gold_documents": ["Pricing"], "gold_passages": ["7-day"], "expected_keywords": ["7"], "tags": ["single", "factual"]}
+{"id": "probation-length", "question": "How long is the probationary period for new hires?", "gold_documents": ["Onboarding Guide"], "gold_passages": ["90 days"], "expected_keywords": ["90"], "tags": ["single", "factual"]}
+
+# --- Follow-up questions with history (tests query rewriting) ---
+{"id": "followup-digital-exception", "question": "What if it's defective?", "history": [{"role": "user", "content": "Are digital downloads refundable?"}, {"role": "assistant", "content": "Digital downloads are non-refundable once the download link has been accessed."}], "gold_documents": ["Refund Policy"], "gold_passages": ["demonstrably defective"], "expected_keywords": ["defective", "replacement"], "tags": ["followup"]}
+{"id": "followup-expedited-cost", "question": "How much does it cost?", "history": [{"role": "user", "content": "How long does expedited shipping take?"}, {"role": "assistant", "content": "Expedited shipping takes 2–3 business days."}], "gold_documents": ["Shipping Policy"], "gold_passages": ["$12.99"], "expected_keywords": ["12.99"], "tags": ["followup"]}
+{"id": "followup-annual-savings", "question": "And how much does the annual plan save?", "history": [{"role": "user", "content": "What is the Pro plan monthly price?"}, {"role": "assistant", "content": "The Pro plan costs $49 per month."}], "gold_documents": ["Pricing"], "gold_passages": ["save 20%"], "expected_keywords": ["20%"], "tags": ["followup"]}
+{"id": "followup-subscription-refund", "question": "What about monthly subscriptions?", "history": [{"role": "user", "content": "Can I get a refund on an annual subscription?"}, {"role": "assistant", "content": "Annual plans cancelled within the first 7 days receive a full refund."}], "gold_documents": ["Refund Policy"], "gold_passages": ["No partial refunds"], "expected_keywords": ["cancel", "billing period"], "tags": ["followup"]}
+{"id": "followup-onboarding-security", "question": "How long does it take?", "history": [{"role": "user", "content": "Is there mandatory security training during onboarding?"}, {"role": "assistant", "content": "Yes, there is a mandatory security training module in the Learning Portal."}], "gold_documents": ["Onboarding Guide"], "gold_passages": ["90 min"], "expected_keywords": ["90"], "tags": ["followup"]}
+{"id": "followup-lost-package-deadline", "question": "When do I need to report it by?", "history": [{"role": "user", "content": "What should I do if my package is lost?"}, {"role": "assistant", "content": "You should report a lost package to us and we will file a carrier claim."}], "gold_documents": ["Shipping Policy"], "gold_passages": ["30 days of the estimated delivery date"], "expected_keywords": ["30 days"], "tags": ["followup"]}
+
+# --- Comparison / multi-part questions ---
+{"id": "compare-shipping-methods", "question": "What is the difference in cost and delivery time between standard and expedited shipping?", "gold_documents": ["Shipping Policy"], "gold_passages": ["Standard", "Expedited"], "expected_keywords": ["5–7", "2–3", "4.99", "12.99"], "tags": ["comparison"]}
+{"id": "compare-pro-business", "question": "How do the Pro and Business plans differ in storage and monthly answer limits?", "gold_documents": ["Pricing"], "gold_passages": ["10 GB", "100 GB", "2 000", "20 000"], "expected_keywords": ["Pro", "Business", "GB"], "tags": ["comparison"]}
+{"id": "compare-refund-standard-vs-digital", "question": "What is the refund window for standard products versus digital goods?", "gold_documents": ["Refund Policy"], "gold_passages": ["30 days", "non-refundable"], "expected_keywords": ["30 days", "non-refundable", "digital"], "tags": ["comparison"]}
+{"id": "compare-annual-monthly-pricing", "question": "If I pay annually instead of monthly, how much do I save on the Business plan per year?", "gold_documents": ["Pricing"], "gold_passages": ["$1 910", "$199"], "expected_keywords": ["Business", "annual", "1910"], "tags": ["comparison"]}
+
+# --- Should-abstain cases ---
+{"id": "abstain-ceo-colour", "question": "What is the CEO's favourite colour?", "should_abstain": true, "tags": ["abstain"]}
+{"id": "abstain-competitor-pricing", "question": "How does our pricing compare to Notion?", "should_abstain": true, "tags": ["abstain"]}
+{"id": "abstain-stock-price", "question": "What is the current stock price?", "should_abstain": true, "tags": ["abstain"]}
+{"id": "abstain-hr-private", "question": "What is Taylor Kim's salary?", "should_abstain": true, "tags": ["abstain"]}

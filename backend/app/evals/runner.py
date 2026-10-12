@@ -63,6 +63,7 @@ async def _run_case(
                 RAGRequest(
                     query=case.question, knowledge_base_ids=kb_ids, model=model,
                     agentic=agentic, mode=mode,
+                    conversation_history=case.history or None,
                 ),
                 scope=scope,
                 actor=Actor(

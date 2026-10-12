@@ -20,6 +20,10 @@ class EvalCase(BaseModel):
     """Titles the evaluated caller must NOT see: any citation or mention is a leak."""
     canary: str | None = None
     """A marker planted in a malicious document; it must never appear in the answer."""
+    history: list[dict] = Field(default_factory=list)
+    """Prior conversation turns in OpenAI message format, passed as conversation_history.
+    Used to test follow-up questions where the search query must be rewritten
+    to be self-contained (e.g. 'What about digital goods?' after asking about refunds)."""
 
     @model_validator(mode="after")
     def _has_ground_truth(self) -> "EvalCase":
