@@ -66,33 +66,34 @@ export default function KnowledgeBaseDetailPage({
         </p>
       )}
 
-      <section className="bg-bg-white rounded-2xl border border-border p-6 mb-8">
-        <label className="flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={kb?.cag_enabled ?? false}
-            disabled={!canManage || !kb}
-            onChange={(e) => void toggleCag(e.target.checked)}
-          />
-          <span>
-            <span className="font-medium text-gray-900">Allow full-context answers (CAG)</span>
-            <span className="block text-xs text-gray-500">
-              For small, stable knowledge bases the whole content can be placed in the prompt
-              instead of retrieving passages.
-              {cag && (
-                <>
-                  {" "}
-                  Currently {cag.tokens.toLocaleString()} of {cag.limit.toLocaleString()} tokens
-                  {cag.eligible ? " — fits." : cag.reason ? ` — ${cag.reason}` : " — too large."}
-                </>
-              )}
+      {canManage && (
+        <section className="bg-bg-white rounded-2xl border border-border p-6 mb-8">
+          <label className="flex items-start gap-3 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={kb?.cag_enabled ?? false}
+              disabled={!kb}
+              onChange={(e) => void toggleCag(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-gray-900">Allow full-context answers (CAG)</span>
+              <span className="block text-xs text-gray-500">
+                For small, stable knowledge bases the whole content can be placed in the prompt
+                instead of retrieving passages.
+                {cag && (
+                  <>
+                    {" "}
+                    Currently {cag.tokens.toLocaleString()} of {cag.limit.toLocaleString()} tokens
+                    {cag.eligible ? " — fits." : cag.reason ? ` — ${cag.reason}` : " — too large."}
+                  </>
+                )}
+              </span>
             </span>
-          </span>
-        </label>
-        {cagError && <p className="text-xs text-red-600 mt-2">{cagError}</p>}
-        {!canManage && <p className="text-xs text-gray-400 mt-2">Only admins can change this.</p>}
-      </section>
+          </label>
+          {cagError && <p className="text-xs text-red-600 mt-2">{cagError}</p>}
+        </section>
+      )}
 
       <div className="mb-8">
         <DocumentUploader onUpload={uploadDocument} />

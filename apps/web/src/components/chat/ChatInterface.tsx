@@ -42,6 +42,7 @@ export default function ChatInterface({
   const [pin, setPin] = useState<{ afterId: string | null; id: string } | null>(null);
   const [highlight, setHighlight] = useState<{ id: string; index: number } | null>(null);
   const { currentOrg } = useOrganization();
+  const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   // Web search needs the deployment flag AND this opt-in; the server enforces both.
   const webSearchAllowed = currentOrg?.settings?.web_search_enabled === true;
   const { messages, sendMessage, isStreaming, error, conversationId, loading, restoredKbId } =
@@ -172,65 +173,83 @@ export default function ChatInterface({
         )}
 
         <div className="border-t border-border px-5 py-3">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOptionsOpen(!optionsOpen)}
-              aria-expanded={optionsOpen}
-              aria-controls="chat-options"
-              className="min-h-8 cursor-pointer rounded-lg px-2 text-xs font-medium text-text-muted transition-colors hover:bg-bg hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              Options {optionsOpen ? "(hide)" : ""}
-            </button>
-            {agentic && <OptionChip>Deep research</OptionChip>}
-            {mode !== "rag" && <OptionChip>{MODE_LABEL[mode]}</OptionChip>}
-            {webSearch && webSearchAllowed && <OptionChip>Web search</OptionChip>}
-          </div>
-          {optionsOpen && (
-            <div id="chat-options" className="mb-3 space-y-3 rounded-lg bg-bg px-3 py-3 text-xs text-text-muted">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input type="checkbox" checked={agentic} onChange={(e) => setAgentic(e.target.checked)} className="mt-0.5" />
-                <span>
-                  <span className="font-medium text-text">Deep research</span>: runs several searches for
-                  multi-part questions. Slower and costs more.
-                </span>
-              </label>
-              <label className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-text">Answer mode</span>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as AnswerMode)}
-                  className="rounded-md border border-border bg-bg-white px-2 py-1 text-xs"
+          {isAdmin ? (
+            /* Admin: full options panel */
+            <>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOptionsOpen(!optionsOpen)}
+                  aria-expanded={optionsOpen}
+                  aria-controls="chat-options"
+                  className="min-h-8 cursor-pointer rounded-lg px-2 text-xs font-medium text-text-muted transition-colors hover:bg-bg hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
                 >
-                  <option value="rag">Retrieval (RAG)</option>
-                  <option value="cag">Full context (CAG)</option>
-                  <option value="hybrid">Full context, fall back to RAG</option>
-                </select>
-              </label>
-              <label
-                className={`flex items-start gap-2 ${webSearchAllowed ? "cursor-pointer" : "opacity-60"}`}
-                title={webSearchAllowed ? undefined : "An organization admin must enable web search in Settings"}
-              >
+                  Options {optionsOpen ? "(hide)" : ""}
+                </button>
+                {agentic && <OptionChip>Deep research</OptionChip>}
+                {mode !== "rag" && <OptionChip>{MODE_LABEL[mode]}</OptionChip>}
+                {webSearch && webSearchAllowed && <OptionChip>Web search</OptionChip>}
+              </div>
+              {optionsOpen && (
+                <div id="chat-options" className="mb-3 space-y-3 rounded-lg bg-bg px-3 py-3 text-xs text-text-muted">
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input type="checkbox" checked={agentic} onChange={(e) => setAgentic(e.target.checked)} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-text">Deep research</span>: runs several searches for
+                      multi-part questions. Slower and costs more.
+                    </span>
+                  </label>
+                  <label className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-text">Answer mode</span>
+                    <select
+                      value={mode}
+                      onChange={(e) => setMode(e.target.value as AnswerMode)}
+                      className="rounded-md border border-border bg-bg-white px-2 py-1 text-xs"
+                    >
+                      <option value="rag">Retrieval (RAG)</option>
+                      <option value="cag">Full context (CAG)</option>
+                      <option value="hybrid">Full context, fall back to RAG</option>
+                    </select>
+                  </label>
+                  <label
+                    className={`flex items-start gap-2 ${webSearchAllowed ? "cursor-pointer" : "opacity-60"}`}
+                    title={webSearchAllowed ? undefined : "An organization admin must enable web search in Settings"}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={webSearch && webSearchAllowed}
+                      disabled={!webSearchAllowed}
+                      onChange={(e) => setWebSearch(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium text-text">Web search</span> when the knowledge base falls
+                      short
+                    </span>
+                  </label>
+                  {mode !== "rag" && (
+                    <p className="text-[11px]">
+                      Full-context mode only works for knowledge bases an admin enabled for it and that fit the
+                      context budget; otherwise it falls back to retrieval.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : webSearchAllowed ? (
+            /* Normal user: simple web-search toggle only (if org has it enabled) */
+            <div className="mb-2">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-text-muted">
                 <input
                   type="checkbox"
-                  checked={webSearch && webSearchAllowed}
-                  disabled={!webSearchAllowed}
+                  checked={webSearch}
                   onChange={(e) => setWebSearch(e.target.checked)}
-                  className="mt-0.5"
+                  className="rounded"
                 />
-                <span>
-                  <span className="font-medium text-text">Web search</span> when the knowledge base falls
-                  short
-                </span>
+                <span>Search the web too</span>
               </label>
-              {mode !== "rag" && (
-                <p className="text-[11px]">
-                  Full-context mode only works for knowledge bases an admin enabled for it and that fit the
-                  context budget; otherwise it falls back to retrieval.
-                </p>
-              )}
             </div>
-          )}
+          ) : null}
           <ChatInput onSend={sendMessage} disabled={isStreaming || selectedKbIds.length === 0} />
         </div>
       </section>
