@@ -6,13 +6,15 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type { OrgMember, OrgRole } from "@/lib/types";
 
-const ROLES: OrgRole[] = ["owner", "admin", "member", "viewer"];
+const OWNER_ASSIGNABLE: OrgRole[] = ["owner", "admin", "member", "viewer"];
+const ADMIN_ASSIGNABLE: OrgRole[] = ["member", "viewer"];
 
 export default function SettingsPage() {
   const { currentOrg, refresh } = useOrganization();
   const orgId = currentOrg?.id;
   const canManage = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   const isOwner = currentOrg?.role === "owner";
+  const assignableRoles = isOwner ? OWNER_ASSIGNABLE : ADMIN_ASSIGNABLE;
 
   const {
     data: members,
@@ -111,10 +113,10 @@ export default function SettingsPage() {
                 <tr key={m.id}>
                   <td className="py-2 font-mono text-xs text-gray-700">{m.user_id}</td>
                   <td className="py-2">
-                    {isOwner ? (
+                    {canManage ? (
                       <select
                         value={m.role}
-                        disabled={busy}
+                        disabled={busy || !assignableRoles.includes(m.role as OrgRole)}
                         onChange={(e) =>
                           run(async () => {
                             await api.patch(
@@ -125,13 +127,19 @@ export default function SettingsPage() {
                             await reloadMembers();
                           })
                         }
-                        className="rounded-md border border-gray-200 px-2 py-1 text-xs"
+                        className="rounded-md border border-gray-200 px-2 py-1 text-xs disabled:opacity-60"
                       >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
+                        {assignableRoles.includes(m.role as OrgRole)
+                          ? assignableRoles.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))
+                          : [m.role].map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
                       </select>
                     ) : (
                       m.role
@@ -196,7 +204,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNewRole(e.target.value as OrgRole)}
                 className="mt-1 block rounded-md border border-gray-200 px-2 py-1.5 text-sm"
               >
-                {ROLES.filter((r) => r !== "owner").map((r) => (
+                {assignableRoles.filter((r) => r !== "owner").map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -211,8 +219,8 @@ export default function SettingsPage() {
             </button>
           </form>
         )}
-        {isOwner === false && canManage && (
-          <p className="text-xs text-gray-400 mt-2">Only owners can change roles.</p>
+        {canManage && !isOwner && (
+          <p className="text-xs text-gray-400 mt-2">Admins can assign member and viewer roles only.</p>
         )}
       </section>
     </div>

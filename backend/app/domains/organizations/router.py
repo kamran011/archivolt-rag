@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -87,6 +87,8 @@ async def add_member(
     ),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    if current_user.role == OrgRole.admin and data.role not in (OrgRole.member, OrgRole.viewer):
+        raise HTTPException(status_code=403, detail="Admins can only assign member or viewer roles.")
     member = await org_service.add_member(db, org_id, data)
     return OrgMemberResponse.model_validate(member)
 
@@ -96,9 +98,13 @@ async def update_member_role(
     org_id: uuid.UUID,
     member_id: uuid.UUID,
     data: OrgMemberUpdate,
-    current_user: CurrentUser = Depends(require_role_in_path_org(OrgRole.owner)),
+    current_user: CurrentUser = Depends(
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
+    ),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    if current_user.role == OrgRole.admin and data.role not in (OrgRole.member, OrgRole.viewer):
+        raise HTTPException(status_code=403, detail="Admins can only assign member or viewer roles.")
     member = await org_service.update_member_role(db, org_id, member_id, data)
     return OrgMemberResponse.model_validate(member)
 

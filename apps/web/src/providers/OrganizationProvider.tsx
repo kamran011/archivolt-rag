@@ -49,6 +49,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     localStorage.setItem(STORAGE_KEY, id);
   }
 
+  // Re-fetch org list (and roles) whenever the tab regains focus, so a role change
+  // made in another tab or by another user propagates within seconds.
+  useEffect(() => {
+    const onFocus = () => { void refresh(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh]);
+
   // A brand-new sign-up has an auth account but no workspace yet. Create a default one
   // automatically the first time we see that, instead of making sign-up a two-step flow
   // (account, then a separate "create your workspace" page). Guarded so it only ever
