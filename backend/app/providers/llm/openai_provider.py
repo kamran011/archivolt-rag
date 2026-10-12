@@ -4,6 +4,7 @@ from openai import AsyncOpenAI
 
 from app.config import settings
 from app.core.exceptions import provider_error
+from app.providers.cost import record_llm_usage
 from app.providers.llm.base import LLMProvider, LLMResponse
 
 
@@ -32,10 +33,13 @@ class OpenAIProvider(LLMProvider):
             raise provider_error("OpenAI", "generation", e) from e
 
         choice = response.choices[0]
+        prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+        completion_tokens = response.usage.completion_tokens if response.usage else 0
+        record_llm_usage(prompt_tokens, completion_tokens, self.model)
         return LLMResponse(
             content=choice.message.content or "",
-            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
-            completion_tokens=response.usage.completion_tokens if response.usage else 0,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             model=response.model,
             finish_reason=choice.finish_reason or "stop",
         )

@@ -44,7 +44,7 @@ from app.domains.retrieval.sufficiency import (
 )
 from app.domains.tools.base import ToolContext, ToolExecutor
 from app.domains.tools.registry import default_registry
-from app.providers.cost import estimate_llm_cost
+from app.providers.cost import estimate_llm_cost, meter_total_usd, start_meter
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.registry import get_llm_provider
 from app.providers.reranker.registry import get_reranker
@@ -542,6 +542,7 @@ class RAGService:
         scope: AccessScope | None = None,
         actor: Actor | None = None,
     ) -> RAGResponse:
+        meter = start_meter()
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
@@ -620,23 +621,19 @@ class RAGService:
 
         retrieval_metadata["prompt_tokens"] = llm_response.prompt_tokens
         retrieval_metadata["completion_tokens"] = llm_response.completion_tokens
-        retrieval_metadata["estimated_cost_usd"] = round(
-            estimate_llm_cost(
-                llm_response.prompt_tokens, llm_response.completion_tokens, request.model
-            )
-            + (retrieval_result.agent.planner_cost_usd if retrieval_result.agent else 0.0),
-            6,
-        )
 
         # 7. Citations
         with trace.span("citation_parsing"):
             citations = CitationParser.parse_citations(llm_response.content, selected_chunks)
 
-        # 8. Claim verification + conflict handling
+        # 8. Claim verification + conflict handling (verifier + conflict detector also call
+        #    generate(), so cost is read from the meter *after* they run, not before).
         with trace.span("claim_verification", claims_checked=len(citations)):
             final = await _finalize_answer(request.query, llm_response.content, selected_chunks, llm)
         if final.abstained:
             citations = []
+
+        retrieval_metadata["estimated_cost_usd"] = round(meter_total_usd(meter), 6)
 
         trace_summary = trace.finish(
             abstained=final.abstained,
@@ -687,6 +684,7 @@ class RAGService:
         actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
         """Same pipeline through context assembly, then streams tokens via SSE-shaped events."""
+        meter = start_meter()
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
 
@@ -758,16 +756,14 @@ class RAGService:
         if final.abstained:
             citations = []
 
-        # Streaming responses don't carry token usage on the wire, so cost is
-        # a tiktoken-based estimate rather than the exact figure query() gets.
+        # Streaming responses don't carry token usage on the wire.  The meter
+        # already recorded all non-streaming generate() calls (verifier, conflict
+        # detector, rewrite).  Add a tiktoken estimate for the streamed generation.
         prompt_text = "\n".join(m["content"] for m in messages)
         estimated_prompt_tokens = _token_estimate.count(prompt_text)
         estimated_completion_tokens = _token_estimate.count(full_answer)
-        estimated_cost = round(
-            estimate_llm_cost(estimated_prompt_tokens, estimated_completion_tokens, request.model)
-            + (retrieval_result.agent.planner_cost_usd if retrieval_result.agent else 0.0),
-            6,
-        )
+        streamed_cost = estimate_llm_cost(estimated_prompt_tokens, estimated_completion_tokens, request.model)
+        estimated_cost = round(meter_total_usd(meter) + streamed_cost, 6)
 
         trace_summary = trace.finish(
             abstained=final.abstained,

@@ -4,6 +4,7 @@ from anthropic import AsyncAnthropic
 
 from app.config import settings
 from app.core.exceptions import provider_error
+from app.providers.cost import record_llm_usage
 from app.providers.llm.base import LLMProvider, LLMResponse
 
 
@@ -42,10 +43,13 @@ class AnthropicProvider(LLMProvider):
             raise provider_error("Anthropic", "generation", e) from e
 
         text = "".join(block.text for block in response.content if block.type == "text")
+        prompt_tokens = response.usage.input_tokens
+        completion_tokens = response.usage.output_tokens
+        record_llm_usage(prompt_tokens, completion_tokens, self.model)
         return LLMResponse(
             content=text,
-            prompt_tokens=response.usage.input_tokens,
-            completion_tokens=response.usage.output_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             model=response.model,
             finish_reason=response.stop_reason or "end_turn",
         )

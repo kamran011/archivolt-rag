@@ -2,6 +2,8 @@
 
 import uuid
 
+import pytest
+
 from app.config import settings
 from app.domains.chat.schemas import ChatRequest
 from app.domains.rag.schemas import RAGRequest
@@ -60,3 +62,22 @@ def test_openrouter_style_ids_route_to_the_openai_compatible_client(monkeypatch)
 def test_free_models_cost_nothing():
     assert cost.estimate_llm_cost(10_000, 5_000, "vendor/some-model:free") == 0.0
     assert cost.estimate_llm_cost(1_000_000, 0, "gpt-4o") > 0
+
+
+def test_model_pricing_uses_longest_prefix():
+    """gpt-4o-mini must not match the gpt-4o prefix and use gpt-4o rates."""
+    mini_cost = cost.estimate_llm_cost(1_000_000, 0, "gpt-4o-mini")
+    full_cost = cost.estimate_llm_cost(1_000_000, 0, "gpt-4o")
+    # gpt-4o-mini input = $0.15/M, gpt-4o input = $2.50/M — ~16x difference
+    assert mini_cost == pytest.approx(0.15), f"gpt-4o-mini input rate should be $0.15/M, got {mini_cost}"
+    assert full_cost == pytest.approx(2.50), f"gpt-4o input rate should be $2.50/M, got {full_cost}"
+    assert mini_cost < full_cost
+
+
+def test_openrouter_prefix_stripped_for_pricing():
+    """openai/gpt-4o-mini (OpenRouter ID) should price as gpt-4o-mini, not as an unknown model."""
+    openrouter_cost = cost.estimate_llm_cost(1_000_000, 0, "openai/gpt-4o-mini")
+    bare_cost = cost.estimate_llm_cost(1_000_000, 0, "gpt-4o-mini")
+    assert openrouter_cost == bare_cost, (
+        f"OpenRouter prefix should not affect pricing: openai/gpt-4o-mini={openrouter_cost}, gpt-4o-mini={bare_cost}"
+    )
