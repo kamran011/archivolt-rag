@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+export const runtime = 'edge';
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
