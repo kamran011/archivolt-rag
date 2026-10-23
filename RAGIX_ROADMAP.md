@@ -273,7 +273,16 @@ Embedding cache
 - **New gap found in this audit:** fine-grained knowledge-strip
   decomposition/recombination — correction today operates at chunk
   granularity, not sub-chunk strips
-- Human escalation
+- Human escalation — make it concrete (added 2026-10-13, from a
+  customer-support chatbot job spec):
+  - Triggers: the user asks for a human, the user seems frustrated, or the
+    answer abstains (no supporting evidence in the knowledge base)
+  - Handoff: send the full conversation (messages, cited sources, abstain
+    reason) to the team via Slack or email, with a link back to the trace
+  - Escalation rules (trigger list, destination) are per-organization
+    settings, not code, so an admin can change them without a deploy
+  - Reuse the existing abstain/evidence-gate signals; don't add a new
+    classifier unless frustration detection can't be done with a rule
 - Agent workflow/report generation
 
 **Redis for agentic workloads:**
@@ -326,6 +335,14 @@ Agent
 - Slack/Teams-style channels
 - WhatsApp/Twilio
 - n8n/workflow integrations
+- Embeddable website chat widget (added 2026-10-13) — one script tag, answers
+  from a chosen KB, anonymous visitors scoped to that KB only (never an org
+  member's access scope). Ship this before WhatsApp: no third-party
+  approval, cheaper, and it exercises the same public-chat API
+- Lead capture from chat (added 2026-10-13) — collect name, email and issue
+  type during a conversation and push it to a CRM or Google Sheets through
+  the CRM-connector item above. Collection must be consent-aware and
+  covered by the V3 retention guardrails
 
 **Prerequisite before this version starts:** extract `KnowledgeConnector` as
 an ABC (`Upload`, `Website`, `S3`, `External APIs` already; `Google Drive`,
@@ -366,6 +383,11 @@ something like SQS rather than defaulting to Redis for everything.
   on a provider-side model change — drift (provider or corpus) would only
   surface from a user complaint, not a metric
 - Production observability
+- Failure alerting (added 2026-10-13) — notify admins by Slack or email
+  when ingestion jobs fail repeatedly, chat requests error out, or the
+  provider is unreachable. Today failures only show in logs and in the
+  document's `failed` status. Alert on rates over a window, not every
+  single error, so it doesn't become noise
 - Faithfulness/groundedness
 - Answer accuracy
 - Retrieval-vs-answer evaluation
