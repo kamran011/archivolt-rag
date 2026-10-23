@@ -55,7 +55,8 @@ export default function ChatInterface({
   // Reopening a past conversation: restore the KB it was scoped to instead of
   // leaving the picker empty (which silently disables the send button).
   useEffect(() => {
-    if (restoredKbId) setSelectedKbIds((prev) => (prev.length === 0 ? [restoredKbId] : prev));
+// eslint-disable-next-line react-hooks/set-state-in-effect
+        if (restoredKbId) setSelectedKbIds((prev) => (prev.length === 0 ? [restoredKbId] : prev));
   }, [restoredKbId]);
 
   // After the first reply in a new conversation, update the URL so a refresh restores it.
