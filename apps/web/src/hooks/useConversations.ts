@@ -28,7 +28,8 @@ export function useConversations() {
   }, [currentOrg]);
 
   useEffect(() => {
-    refresh();
+// eslint-disable-next-line react-hooks/set-state-in-effect
+        refresh();
   }, [refresh]);
 
   return { conversations, loading, refresh };
