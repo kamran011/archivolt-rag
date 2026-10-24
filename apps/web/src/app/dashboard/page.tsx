@@ -15,14 +15,14 @@ export default function DashboardPage() {
             { label: "Documents", value: "—", href: "/dashboard/knowledge-bases" },
             { label: "Conversations", value: "—", href: "/dashboard/chat" },
           ].map((stat) => (
-            <a
+            <Link
               key={stat.label}
               href={stat.href}
               className="rounded-xl p-4 transition-colors hover:bg-gray-50 sm:first:pl-0 sm:last:pr-0"
             >
               <p className="text-sm text-gray-500">{stat.label}</p>
               <p className="text-2xl font-semibold text-gray-900 mt-1">{stat.value}</p>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

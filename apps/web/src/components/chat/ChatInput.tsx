@@ -42,6 +42,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           disabled={disabled}
           rows={1}
+          aria-label="Message input"
           placeholder="Type your message…"
           className="w-full resize-none bg-transparent border-none outline-none text-sm text-text placeholder:text-text-muted max-h-32 disabled:opacity-50"
         />
