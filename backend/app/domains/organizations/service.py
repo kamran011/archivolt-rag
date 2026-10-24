@@ -213,10 +213,15 @@ class OrganizationService:
             f"?invite={invite.id}&org={org_id}"
         )
         supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-        supabase.auth.admin.invite_user_by_email(
-            invite.email,
-            options={"redirect_to": redirect_to},
-        )
+        try:
+            supabase.auth.admin.invite_user_by_email(
+                invite.email,
+                options={"redirect_to": redirect_to},
+            )
+        except Exception as exc:
+            # Supabase raises if the user already has a recent pending invite;
+            # treat it as a success — the existing link is still valid.
+            logger.warning("invitation_resend_supabase_error", invite_id=str(invite.id), error=str(exc))
         logger.info("invitation_resent", invite_id=str(invite.id), org_id=str(org_id), email=invite.email)
         return invite
 
