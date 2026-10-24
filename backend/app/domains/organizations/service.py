@@ -1,9 +1,11 @@
 import uuid
 
 import structlog
+from supabase import create_client
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.domains.organizations.schemas import OrgCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
 from app.models.organization import Organization
@@ -126,14 +128,25 @@ class OrganizationService:
         org_id: uuid.UUID,
         data: OrgMemberCreate,
     ) -> OrganizationMember:
+        # Resolve email → user_id via Supabase Admin API
+        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        response = supabase.auth.admin.list_users()
+        user_id: uuid.UUID | None = None
+        for u in response:
+            if u.email and u.email.lower() == data.email.lower():
+                user_id = uuid.UUID(u.id)
+                break
+        if user_id is None:
+            raise ValidationError(f"No account found for email '{data.email}'. The user must sign up first.")
+
         # Check not already a member
-        existing = await self._get_member(db, org_id, data.user_id)
+        existing = await self._get_member(db, org_id, user_id)
         if existing:
             raise ValidationError("User is already a member of this organization")
 
         member = OrganizationMember(
             organization_id=org_id,
-            user_id=data.user_id,
+            user_id=user_id,
             role=data.role,
         )
         db.add(member)

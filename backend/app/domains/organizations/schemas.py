@@ -50,7 +50,7 @@ class OrgResponse(BaseModel):
 
 
 class OrgMemberCreate(BaseModel):
-    user_id: uuid.UUID
+    email: str
     role: OrgRole = OrgRole.member
 
 

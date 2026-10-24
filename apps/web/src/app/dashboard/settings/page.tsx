@@ -32,7 +32,7 @@ export default function SettingsPage() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newUserId, setNewUserId] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<OrgRole>("member");
 
   if (!currentOrg) {
@@ -195,21 +195,22 @@ export default function SettingsPage() {
               void run(async () => {
                 await api.post(
                   `/api/v1/organizations/${org.id}/members`,
-                  { user_id: newUserId.trim(), role: newRole },
+                  { email: newEmail.trim(), role: newRole },
                   org.id,
                 );
-                setNewUserId("");
+                setNewEmail("");
                 await reloadMembers();
               });
             }}
           >
             <label className="flex-1 min-w-64 text-xs text-gray-500">
-              User ID (from Supabase Auth)
+              Email address
               <input
-                value={newUserId}
-                onChange={(e) => setNewUserId(e.target.value)}
-                placeholder="00000000-0000-0000-0000-000000000000"
-                className="mt-1 block w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm font-mono"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="user@example.com"
+                className="mt-1 block w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm"
                 required
               />
             </label>
@@ -228,7 +229,7 @@ export default function SettingsPage() {
               </select>
             </label>
             <button
-              disabled={busy || !newUserId.trim()}
+              disabled={busy || !newEmail.trim()}
               className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add member
