@@ -91,6 +91,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Suppress the native browser focus ring on form controls so only our
+   custom :focus-visible ring (below) renders — avoids the double-ring effect. */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
