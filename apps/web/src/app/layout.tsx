@@ -16,6 +16,36 @@ export const metadata: Metadata = {
   title: "Ragix — AI Knowledge Platform",
   description:
     "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
+  metadataBase: new URL("https://archivolt-rag.vercel.app"),
+  alternates: {
+    canonical: "https://archivolt-rag.vercel.app",
+  },
+  openGraph: {
+    title: "Ragix — AI Knowledge Platform",
+    description:
+      "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
+    url: "https://archivolt-rag.vercel.app",
+    siteName: "Ragix",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ragix — AI Knowledge Platform",
+    description:
+      "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Ragix",
+  applicationCategory: "BusinessApplication",
+  description:
+    "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
+  url: "https://archivolt-rag.vercel.app",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  operatingSystem: "Web",
 };
 
 export default function RootLayout({
@@ -25,6 +55,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${jakarta.variable} ${geistMono.variable} antialiased`}
       >
