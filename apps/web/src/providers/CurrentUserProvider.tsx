@@ -19,17 +19,12 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const supabase = createClient();
-    let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setUser(data.user);
-    });
+    // onAuthStateChange fires INITIAL_SESSION immediately from local storage —
+    // no network call needed; getUser() would be a redundant round-trip.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const initials = (user?.email ?? "?").split("@")[0].slice(0, 2).toUpperCase();

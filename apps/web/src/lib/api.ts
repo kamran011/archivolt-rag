@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Deduplicates concurrent GET requests to the same path+org so React StrictMode
+// double-mount and rapid re-renders never send two identical network calls.
+const getInFlight = new Map<string, Promise<unknown>>();
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -69,8 +73,16 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string, organizationId?: string) =>
-    request<T>(path, { method: "GET", organizationId }),
+  get: <T>(path: string, organizationId?: string): Promise<T> => {
+    const key = `${organizationId ?? ""}|${path}`;
+    const existing = getInFlight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+    const p = request<T>(path, { method: "GET", organizationId }).finally(() =>
+      getInFlight.delete(key),
+    );
+    getInFlight.set(key, p);
+    return p;
+  },
 
   post: <T>(path: string, body: unknown, organizationId?: string) =>
     request<T>(path, {
