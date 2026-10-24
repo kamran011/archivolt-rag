@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=2.1.0",
     "pgvector>=0.3.6",
     "structlog>=24.4.0",
+    "email-validator>=2.2.0",
 ]
 
 [project.optional-dependencies]
