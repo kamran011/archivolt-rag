@@ -72,18 +72,31 @@ export default function SettingsPage() {
 
   return (
     <div>
+      {busy && (
+        <div className="skeleton fixed top-0 left-0 right-0 h-0.5 z-50" aria-hidden />
+      )}
       <h1 className="text-2xl font-semibold text-gray-900 mb-1">Settings</h1>
       <p className="text-gray-500 text-sm mb-6">
         {org.name} · you are {org.role ?? "a member"}
       </p>
 
       {error && (
-        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
-          {error}
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            className="cursor-pointer shrink-0 text-red-400 hover:text-red-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
       )}
 
-      <section className="bg-bg-white rounded-2xl border border-border p-5 mb-6">
+      <section className={`relative bg-bg-white rounded-2xl border border-border p-5 mb-6 transition-opacity duration-200 ${busy ? "opacity-60 pointer-events-none" : ""}`}>
+        {busy && <div className="skeleton absolute inset-0 rounded-2xl opacity-30" aria-hidden />}
         <h2 className="font-medium text-gray-900 mb-1">Web search</h2>
         <p className="text-sm text-gray-500 mb-3">
           Lets members ask the assistant to supplement the knowledge base with public web results.
@@ -113,7 +126,8 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="bg-bg-white rounded-2xl border border-border p-5">
+      <section className={`relative bg-bg-white rounded-2xl border border-border p-5 transition-opacity duration-200 ${busy ? "opacity-60 pointer-events-none" : ""}`}>
+        {busy && <div className="skeleton absolute inset-0 rounded-2xl opacity-30" aria-hidden />}
         <h2 className="font-medium text-gray-900 mb-3">Members</h2>
         {loadError && <p role="alert" className="text-sm text-red-600 mb-2">{loadError}</p>}
         {loading ? (
@@ -248,7 +262,7 @@ export default function SettingsPage() {
               disabled={busy || !newEmail.trim()}
               className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send invite
+              {busy ? "Sending…" : "Send invite"}
             </button>
           </form>
         )}

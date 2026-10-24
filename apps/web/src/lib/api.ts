@@ -10,6 +10,32 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 // double-mount and rapid re-renders never send two identical network calls.
 const getInFlight = new Map<string, Promise<unknown>>();
 
+// Generic HTTP phrases that are meaningless to end users.
+const GENERIC_HTTP_PHRASES = new Set([
+  "not found", "internal server error", "bad request", "unauthorized",
+  "forbidden", "unprocessable entity", "conflict", "service unavailable",
+  "bad gateway", "gateway timeout",
+]);
+
+function friendlyMessage(status: number, backendDetail: unknown): string {
+  // Use the backend detail only when it's a real custom message, not a bare HTTP phrase.
+  if (typeof backendDetail === "string" && backendDetail.trim()) {
+    const lower = backendDetail.trim().toLowerCase();
+    if (!GENERIC_HTTP_PHRASES.has(lower)) return backendDetail.trim();
+  }
+  if (typeof backendDetail === "object" && backendDetail !== null && "msg" in backendDetail) {
+    return String((backendDetail as Record<string, unknown>).msg);
+  }
+  // Fall back to friendly status-based messages.
+  if (status === 401) return "Your session has expired. Please sign in again.";
+  if (status === 403) return "You don't have permission to do that.";
+  if (status === 404) return "The requested resource was not found.";
+  if (status === 409) return "This action conflicts with existing data.";
+  if (status === 422) return "Invalid input. Please check your details and try again.";
+  if (status >= 500) return "Something went wrong while processing your request. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -61,11 +87,11 @@ async function request<T>(
     let detail: unknown;
     try {
       const body = await response.json();
-      detail = body.detail || body;
+      detail = body.detail ?? body;
     } catch {
       detail = await response.text();
     }
-    throw new ApiError(response.status, `API error ${response.status}`, detail);
+    throw new ApiError(response.status, friendlyMessage(response.status, detail), detail);
   }
 
   if (response.status === 204) return undefined as T;
