@@ -80,7 +80,7 @@ export default function AccountMenu({
               {initials}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 truncate">
+              <span className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-medium text-white">{name}</span>
                 {role && (
                   <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium capitalize text-white/50 bg-white/[0.08]">
@@ -91,7 +91,7 @@ export default function AccountMenu({
               <span className="block truncate text-xs text-white/60">{user.email}</span>
             </span>
             <svg
-              className={`h-4 w-4 shrink-0 text-white/50 transition-transform ${open ? "rotate-180" : ""}`}
+              className={`h-4 w-4 shrink-0 text-white/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
