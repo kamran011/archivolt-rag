@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardChrome from "@/components/layout/DashboardChrome";
 import { OrganizationProvider } from "@/providers/OrganizationProvider";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardLayout({
   children,

@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -59,7 +60,7 @@ export default function SettingsPage() {
       </p>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
           {error}
         </div>
       )}
@@ -90,22 +91,29 @@ export default function SettingsPage() {
           Allow web search for this organization
         </label>
         {!canManage && (
-          <p className="text-xs text-gray-400 mt-2">Only owners and admins can change this.</p>
+          <p className="text-xs text-gray-500 mt-2">Only owners and admins can change this.</p>
         )}
       </section>
 
       <section className="bg-bg-white rounded-2xl border border-border p-5">
         <h2 className="font-medium text-gray-900 mb-3">Members</h2>
-        {loadError && <p className="text-sm text-red-600 mb-2">{loadError}</p>}
+        {loadError && <p role="alert" className="text-sm text-red-600 mb-2">{loadError}</p>}
         {loading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <SkeletonRegion label="Loading members" className="divide-y divide-gray-100">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center justify-between py-3">
+                <Skeleton className="h-4 w-2/3 max-w-sm" />
+                <Skeleton className="h-7 w-24" />
+              </div>
+            ))}
+          </SkeletonRegion>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-gray-500">
               <tr>
-                <th className="text-left py-2 font-medium">User</th>
-                <th className="text-left py-2 font-medium">Role</th>
-                <th className="text-right py-2 font-medium" />
+                <th scope="col" className="text-left py-2 font-medium">User</th>
+                <th scope="col" className="text-left py-2 font-medium">Role</th>
+                <th scope="col" className="text-right py-2 font-medium"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -220,7 +228,7 @@ export default function SettingsPage() {
           </form>
         )}
         {canManage && !isOwner && (
-          <p className="text-xs text-gray-400 mt-2">Admins can assign member and viewer roles only.</p>
+          <p className="text-xs text-gray-500 mt-2">Admins can assign member and viewer roles only.</p>
         )}
       </section>
     </div>

@@ -79,25 +79,31 @@ export default function OnboardingPage() {
 
       <form onSubmit={handleSubmit} className="bg-bg-white rounded-2xl border border-border p-6 space-y-5">
         {submitError && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {submitError}
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Organization name</label>
+          <label htmlFor="org-name" className="block text-sm font-medium text-gray-700 mb-1">Organization name</label>
           <input
+            id="org-name"
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "org-name-error" : undefined}
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Acme Inc."
           />
-          {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name}</p>}
+          {errors.name && <p id="org-name-error" role="alert" className="text-red-600 text-xs mt-1">{errors.name}</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+          <label htmlFor="org-slug" className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
           <input
+            id="org-slug"
+            aria-invalid={!!errors.slug}
+            aria-describedby={errors.slug ? "org-slug-error" : undefined}
             value={slug}
             onChange={(e) => {
               setSlugEdited(true);
@@ -106,7 +112,7 @@ export default function OnboardingPage() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="acme-inc"
           />
-          {errors.slug && <p className="text-red-600 text-xs mt-1">{errors.slug}</p>}
+          {errors.slug && <p id="org-slug-error" role="alert" className="text-red-600 text-xs mt-1">{errors.slug}</p>}
         </div>
 
         <button

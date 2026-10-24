@@ -30,7 +30,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-bg">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
@@ -104,6 +104,6 @@ export default function LoginPage() {
           </p>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

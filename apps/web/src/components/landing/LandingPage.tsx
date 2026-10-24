@@ -3,23 +3,25 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-function useReveal(delay = 0) {
+function useReveal(): [React.RefObject<HTMLDivElement | null>, boolean] {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const timer = setTimeout(() => {
-      const obs = new IntersectionObserver(
-        ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
-        { threshold: 0.12 }
-      );
-      obs.observe(el);
-      return () => obs.disconnect();
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
-  return { ref, visible };
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.12 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
 }
 
 const MARQUEE_ITEMS = [
@@ -31,7 +33,7 @@ const MARQUEE_ITEMS = [
 const ACCORDIONS = [
   {
     title: "Upload any document",
-    body: "PDF, DOCX, Markdown, TXT — Ragix parses, chunks, and embeds everything automatically with structure-aware splitting.",
+    body: "Ragix parses PDF, DOCX, Markdown and TXT files, then chunks and embeds them with structure-aware splitting.",
     color: "#a78bfa",
   },
   {
@@ -41,22 +43,22 @@ const ACCORDIONS = [
   },
   {
     title: "Get verified answers",
-    body: "Every answer is backed by retrieved chunks. Contradictions are surfaced. Low-confidence answers are flagged — not fabricated.",
+    body: "Every answer is backed by retrieved chunks. Contradictions are surfaced, and low-confidence answers are flagged instead of guessed.",
     color: "#fbbf24",
   },
   {
     title: "Trace every decision",
-    body: "Open the evidence panel and see exactly what was retrieved, ranked, and why. Full retrieval debugger for engineering teams.",
+    body: "Open the evidence panel to see what was retrieved, how it ranked, and why. Full retrieval debugger for engineering teams.",
     color: "#60a5fa",
   },
 ];
 
 export default function LandingPage() {
-  const hero = useReveal(0);
-  const marquee = useReveal(100);
-  const bento = useReveal(100);
-  const accordion = useReveal(100);
-  const cta = useReveal(100);
+  const [heroRef, heroVisible] = useReveal();
+  const [marqueeRef, marqueeVisible] = useReveal();
+  const [bentoRef, bentoVisible] = useReveal();
+  const [accordionRef, accordionVisible] = useReveal();
+  const [ctaRef, ctaVisible] = useReveal();
   const [openAccordion, setOpenAccordion] = useState(0);
 
   useEffect(() => {
@@ -103,23 +105,19 @@ export default function LandingPage() {
       {/* Hero */}
       <section id="main-content" style={{ position: "relative", zIndex: 1, maxWidth: "1100px", margin: "0 auto", padding: "200px 24px 140px", textAlign: "center" }}>
         <div
-          ref={hero.ref}
-          style={{ transition: "opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)", opacity: hero.visible ? 1 : 0, transform: hero.visible ? "none" : "translateY(36px)" }}
+          ref={heroRef} className="rag-reveal"
+          style={{ transition: "opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)", opacity: heroVisible ? 1 : 0, transform: heroVisible ? "none" : "translateY(36px)" }}
         >
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(106,53,255,0.12)", border: "1px solid rgba(106,53,255,0.28)", borderRadius: "9999px", padding: "6px 16px", marginBottom: "40px" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#a78bfa", display: "inline-block", boxShadow: "0 0 8px #a78bfa" }} />
-            <span style={{ color: "#a78bfa", fontSize: "11px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>Production-grade RAG</span>
-          </div>
 
           <h1 style={{ fontSize: "clamp(3rem, 5.5vw, 5.5rem)", fontWeight: 800, color: "#fff", lineHeight: 1.06, letterSpacing: "-2.5px", maxWidth: "900px", margin: "0 auto 28px" }}>
             AI answers your team<br />
             <span style={{ background: "linear-gradient(135deg, #c4b5fd 0%, #a78bfa 40%, #6a35ff 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              can actually trust
+              can trust
             </span>
           </h1>
 
           <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.5)", lineHeight: 1.75, maxWidth: "540px", margin: "0 auto 52px" }}>
-            Upload documents, ask questions, get verified answers with cited sources. Built for teams who cannot afford hallucinations.
+            Upload documents, ask questions, get verified answers with cited sources. When the evidence is thin, Ragix says so instead of guessing.
           </p>
 
           <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
@@ -135,17 +133,18 @@ export default function LandingPage() {
 
       {/* Marquee strip */}
       <div
-        ref={marquee.ref}
-        style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "20px 0", overflow: "hidden", position: "relative", zIndex: 1, transition: "opacity 0.7s", opacity: marquee.visible ? 1 : 0 }}
+        ref={marqueeRef} className="rag-reveal"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "20px 0", overflow: "hidden", position: "relative", zIndex: 1, transition: "opacity 0.7s", opacity: marqueeVisible ? 1 : 0 }}
       >
         <style>{`
           @keyframes rag-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
           .rag-marquee { display: flex; gap: 0; animation: rag-marquee 28s linear infinite; width: max-content; }
+          @media (prefers-reduced-motion: reduce) { .rag-marquee { animation: none; } .rag-reveal { opacity: 1 !important; transform: none !important; transition: none !important; } }
         `}</style>
         <div className="rag-marquee">
           {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: "0", padding: "0 32px" }}>
-              <span style={{ color: "rgba(255,255,255,0.28)", fontSize: "12px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{item}</span>
+              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{item}</span>
               <span style={{ color: "rgba(106,53,255,0.5)", fontSize: "20px", marginLeft: "32px" }}>·</span>
             </div>
           ))}
@@ -154,12 +153,12 @@ export default function LandingPage() {
 
       {/* Bento grid */}
       <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "120px 24px 80px", position: "relative", zIndex: 1 }}>
-        <div ref={bento.ref} style={{ transition: "opacity 0.8s, transform 0.8s cubic-bezier(0.16,1,0.3,1)", opacity: bento.visible ? 1 : 0, transform: bento.visible ? "none" : "translateY(28px)" }}>
+        <div ref={bentoRef} className="rag-reveal" style={{ transition: "opacity 0.8s, transform 0.8s cubic-bezier(0.16,1,0.3,1)", opacity: bentoVisible ? 1 : 0, transform: bentoVisible ? "none" : "translateY(28px)" }}>
           <h2 style={{ fontSize: "clamp(2rem, 3.5vw, 3.2rem)", fontWeight: 800, color: "#fff", letterSpacing: "-1.5px", marginBottom: "12px" }}>
-            Built differently
+            How Ragix answers
           </h2>
           <p style={{ color: "rgba(255,255,255,0.38)", fontSize: "16px", marginBottom: "48px", maxWidth: "460px" }}>
-            Most RAG systems retrieve. Ragix retrieves, verifies, and explains — every time.
+            Ragix retrieves the evidence, verifies each claim against it, and shows its work.
           </p>
 
           {/* 4-col bento: c1 col-span-2 row-span-2 | c2 col-span-2 row-span-1 | c3 col-span-2 row-span-1 */}
@@ -177,7 +176,7 @@ export default function LandingPage() {
               <div style={{ position: "relative" }}>
                 <h3 style={{ color: "#fff", fontSize: "22px", fontWeight: 700, letterSpacing: "-0.5px", marginBottom: "12px" }}>Hybrid retrieval</h3>
                 <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "14.5px", lineHeight: 1.7 }}>
-                  Semantic + keyword search combined with a cross-encoder re-ranker. The most relevant chunks always rise to the top — no hallucinated citations.
+                  Semantic and keyword search combined with a cross-encoder re-ranker, so the most relevant chunks rank first.
                 </p>
                 <div style={{ display: "flex", gap: "8px", marginTop: "24px", flexWrap: "wrap" }}>
                   {["BM25 + dense", "Re-ranking", "Expansion ladder"].map((tag) => (
@@ -209,7 +208,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 style={{ color: "#fff", fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", marginBottom: "6px" }}>Full observability</h3>
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65 }}>Trace every retrieval step — what was fetched, ranked, and why the model answered or abstained.</p>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65 }}>Trace every retrieval step: what was fetched, how it ranked, and why the model answered or abstained.</p>
               </div>
             </div>
 
@@ -219,7 +218,7 @@ export default function LandingPage() {
 
       {/* Horizontal accordion — How it works */}
       <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 24px 120px", position: "relative", zIndex: 1 }}>
-        <div ref={accordion.ref} style={{ transition: "opacity 0.8s, transform 0.8s cubic-bezier(0.16,1,0.3,1)", opacity: accordion.visible ? 1 : 0, transform: accordion.visible ? "none" : "translateY(28px)" }}>
+        <div ref={accordionRef} className="rag-reveal" style={{ transition: "opacity 0.8s, transform 0.8s cubic-bezier(0.16,1,0.3,1)", opacity: accordionVisible ? 1 : 0, transform: accordionVisible ? "none" : "translateY(28px)" }}>
           <h2 style={{ fontSize: "clamp(1.8rem, 3vw, 2.8rem)", fontWeight: 800, color: "#fff", letterSpacing: "-1.2px", marginBottom: "48px" }}>
             From upload to answer<br />in four steps
           </h2>
@@ -227,22 +226,35 @@ export default function LandingPage() {
             {ACCORDIONS.map((item, i) => (
               <div
                 key={i}
-                onClick={() => setOpenAccordion(i)}
-                style={{ borderRadius: "14px", border: `1px solid ${openAccordion === i ? item.color + "30" : "rgba(255,255,255,0.06)"}`, background: openAccordion === i ? "rgba(255,255,255,0.04)" : "transparent", padding: "24px 28px", cursor: "pointer", transition: "all 0.3s" }}
+                style={{ borderRadius: "14px", border: `1px solid ${openAccordion === i ? item.color + "30" : "rgba(255,255,255,0.06)"}`, background: openAccordion === i ? "rgba(255,255,255,0.04)" : "transparent", transition: "all 0.3s" }}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: openAccordion === i ? item.color + "20" : "rgba(255,255,255,0.06)", border: `1px solid ${openAccordion === i ? item.color + "40" : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: openAccordion === i ? item.color : "rgba(255,255,255,0.3)", flexShrink: 0, transition: "all 0.3s" }}>
-                      {i + 1}
+                <h3 style={{ margin: 0 }}>
+                  <button
+                    type="button"
+                    id={`accordion-trigger-${i}`}
+                    aria-expanded={openAccordion === i}
+                    aria-controls={`accordion-panel-${i}`}
+                    onClick={() => setOpenAccordion(i)}
+                    style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: "16px", padding: "24px 28px", background: "none", border: "none", borderRadius: "14px", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: openAccordion === i ? item.color + "20" : "rgba(255,255,255,0.06)", border: `1px solid ${openAccordion === i ? item.color + "40" : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: openAccordion === i ? item.color : "rgba(255,255,255,0.55)", flexShrink: 0, transition: "all 0.3s" }}>
+                        {i + 1}
+                      </span>
+                      <span style={{ color: openAccordion === i ? "#fff" : "rgba(255,255,255,0.6)", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.2px", transition: "color 0.3s" }}>{item.title}</span>
                     </span>
-                    <h3 style={{ color: openAccordion === i ? "#fff" : "rgba(255,255,255,0.5)", fontSize: "16px", fontWeight: 600, letterSpacing: "-0.2px", transition: "color 0.3s" }}>{item.title}</h3>
-                  </div>
-                  <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: openAccordion === i ? "rotate(180deg)" : "none", transition: "transform 0.3s", flexShrink: 0 }} aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div style={{ maxHeight: openAccordion === i ? "100px" : "0", overflow: "hidden", transition: "max-height 0.4s cubic-bezier(0.16,1,0.3,1)" }}>
-                  <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px", lineHeight: 1.7, marginTop: "16px", paddingLeft: "44px" }}>{item.body}</p>
+                    <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: openAccordion === i ? "rotate(180deg)" : "none", transition: "transform 0.3s", flexShrink: 0 }} aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </h3>
+                <div
+                  id={`accordion-panel-${i}`}
+                  role="region"
+                  aria-labelledby={`accordion-trigger-${i}`}
+                  style={{ maxHeight: openAccordion === i ? "220px" : "0", visibility: openAccordion === i ? "visible" : "hidden", overflow: "hidden", transition: "max-height 0.4s cubic-bezier(0.16,1,0.3,1)" }}
+                >
+                  <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", lineHeight: 1.7, margin: 0, padding: "0 28px 24px 72px" }}>{item.body}</p>
                 </div>
               </div>
             ))}
@@ -253,16 +265,16 @@ export default function LandingPage() {
       {/* CTA */}
       <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 24px 160px", position: "relative", zIndex: 1 }}>
         <div
-          ref={cta.ref}
-          style={{ background: "linear-gradient(135deg, #6a35ff 0%, #4a1fcf 100%)", borderRadius: "28px", padding: "80px 48px", textAlign: "center", position: "relative", overflow: "hidden", transition: "opacity 0.9s, transform 0.9s cubic-bezier(0.16,1,0.3,1)", opacity: cta.visible ? 1 : 0, transform: cta.visible ? "none" : "translateY(40px) scale(0.97)" }}
+          ref={ctaRef} className="rag-reveal"
+          style={{ background: "linear-gradient(135deg, #6a35ff 0%, #4a1fcf 100%)", borderRadius: "28px", padding: "80px 48px", textAlign: "center", position: "relative", overflow: "hidden", transition: "opacity 0.9s, transform 0.9s cubic-bezier(0.16,1,0.3,1)", opacity: ctaVisible ? 1 : 0, transform: ctaVisible ? "none" : "translateY(40px) scale(0.97)" }}
         >
           <div aria-hidden style={{ position: "absolute", top: "-80px", right: "-80px", width: "360px", height: "360px", background: "rgba(255,255,255,0.07)", borderRadius: "50%" }} />
           <div aria-hidden style={{ position: "absolute", bottom: "-100px", left: "-60px", width: "320px", height: "320px", background: "rgba(255,255,255,0.04)", borderRadius: "50%" }} />
           <h2 style={{ fontSize: "clamp(2rem, 3.5vw, 3.2rem)", fontWeight: 800, color: "#fff", letterSpacing: "-1.5px", marginBottom: "16px", position: "relative" }}>
-            Ready to build on<br />reliable AI?
+            Try Ragix on<br />your own documents
           </h2>
           <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "16px", marginBottom: "44px", position: "relative" }}>
-            Start in minutes. No credit card required.
+            Create a workspace and upload your first document.
           </p>
           <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
             <Link href="/auth/signup" style={{ background: "#fff", color: "#4a1fcf", fontWeight: 700, fontSize: "15px", padding: "15px 36px", borderRadius: "13px", textDecoration: "none", letterSpacing: "-0.2px" }}>
@@ -277,8 +289,8 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "32px 24px", textAlign: "center", position: "relative", zIndex: 1 }}>
-        <p style={{ color: "rgba(255,255,255,0.18)", fontSize: "13px" }}>
-          &copy; {new Date().getFullYear()} Ragix — AI Knowledge Platform
+        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "13px" }}>
+          &copy; {new Date().getFullYear()} Ragix
         </p>
       </footer>
     </div>

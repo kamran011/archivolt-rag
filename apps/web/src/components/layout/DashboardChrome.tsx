@@ -16,7 +16,7 @@ export default function DashboardChrome({
 
   return (
     <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
-      <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <Sidebar user={user} open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header user={user} onMenuClick={() => setMobileNavOpen(true)} />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-7">{children}</main>

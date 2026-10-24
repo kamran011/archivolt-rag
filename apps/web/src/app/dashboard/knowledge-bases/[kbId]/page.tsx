@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { use, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -85,13 +86,13 @@ export default function KnowledgeBaseDetailPage({
                   <>
                     {" "}
                     Currently {cag.tokens.toLocaleString()} of {cag.limit.toLocaleString()} tokens
-                    {cag.eligible ? " — fits." : cag.reason ? ` — ${cag.reason}` : " — too large."}
+                    {cag.eligible ? ". Fits." : cag.reason ? `. ${cag.reason}` : ". Too large."}
                   </>
                 )}
               </span>
             </span>
           </label>
-          {cagError && <p className="text-xs text-red-600 mt-2">{cagError}</p>}
+          {cagError && <p role="alert" className="text-xs text-red-600 mt-2">{cagError}</p>}
         </section>
       )}
 
@@ -100,13 +101,25 @@ export default function KnowledgeBaseDetailPage({
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-gray-400 text-sm text-center py-8">Loading documents…</div>
+        <SkeletonRegion
+          label="Loading documents"
+          className="bg-bg-white rounded-2xl border border-border divide-y divide-gray-100"
+        >
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-6 px-5 py-4">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-10" />
+              <Skeleton className="h-4 w-14" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </SkeletonRegion>
       ) : documents.length === 0 ? (
         <div className="bg-bg-white rounded-2xl border border-border p-10 text-center text-gray-500 text-sm">
           No documents uploaded yet.
@@ -116,12 +129,12 @@ export default function KnowledgeBaseDetailPage({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="text-left px-5 py-3 font-medium">Name</th>
-                <th className="text-left px-5 py-3 font-medium">Type</th>
-                <th className="text-left px-5 py-3 font-medium">Size</th>
-                <th className="text-left px-5 py-3 font-medium">Status</th>
-                <th className="text-left px-5 py-3 font-medium">Access &amp; tags</th>
-                <th className="text-right px-5 py-3 font-medium">Actions</th>
+                <th scope="col" className="text-left px-5 py-3 font-medium">Name</th>
+                <th scope="col" className="text-left px-5 py-3 font-medium">Type</th>
+                <th scope="col" className="text-left px-5 py-3 font-medium">Size</th>
+                <th scope="col" className="text-left px-5 py-3 font-medium">Status</th>
+                <th scope="col" className="text-left px-5 py-3 font-medium">Access &amp; tags</th>
+                <th scope="col" className="text-right px-5 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -135,7 +148,7 @@ export default function KnowledgeBaseDetailPage({
                       {doc.title}
                     </Link>
                     {doc.version > 1 && (
-                      <span className="ml-2 text-[10px] text-gray-400">v{doc.version}</span>
+                      <span className="ml-2 text-[10px] text-gray-500">v{doc.version}</span>
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-gray-500 uppercase text-xs">{doc.file_type}</td>

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ragix — AI Knowledge Platform",
+  title: { default: "Ragix — AI Knowledge Platform", template: "%s — Ragix" },
   description:
     "Production-grade AI knowledge and evidence platform. Retrieve the right evidence, verify answers, cite sources.",
   metadataBase: new URL("https://archivolt-rag.vercel.app"),

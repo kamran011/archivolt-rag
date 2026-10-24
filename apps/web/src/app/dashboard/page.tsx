@@ -1,27 +1,53 @@
+"use client";
+
 import Link from "next/link";
+import { useConversations } from "@/hooks/useConversations";
+import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
+import { useOrganization } from "@/providers/OrganizationProvider";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function DashboardPage() {
+  const { currentOrg, loading: orgLoading } = useOrganization();
+  const { knowledgeBases, loading: kbLoading } = useKnowledgeBases();
+  const { conversations, loading: convLoading } = useConversations();
+
+  const loading = orgLoading || (!!currentOrg && (kbLoading || convLoading));
+  const format = (n: number) => (currentOrg ? n.toLocaleString() : "—");
+
+  const stats = [
+    { label: "Knowledge Bases", value: format(knowledgeBases.length), href: "/dashboard/knowledge-bases" },
+    {
+      label: "Documents",
+      value: format(knowledgeBases.reduce((n, kb) => n + kb.document_count, 0)),
+      href: "/dashboard/knowledge-bases",
+    },
+    { label: "Conversations", value: format(conversations.length), href: "/dashboard/chat" },
+  ];
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-1">Dashboard</h1>
       <p className="text-gray-500 text-sm mb-8">
-        Welcome to Ragix — your AI knowledge platform.
+        Welcome to Ragix.
       </p>
 
-      <div className="rounded-2xl border border-border bg-bg-white p-5 mb-6">
+      <div className="rounded-2xl border border-border bg-bg-white p-5 mb-6" aria-busy={loading}>
         <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {[
-            { label: "Knowledge Bases", value: "—", href: "/dashboard/knowledge-bases" },
-            { label: "Documents", value: "—", href: "/dashboard/knowledge-bases" },
-            { label: "Conversations", value: "—", href: "/dashboard/chat" },
-          ].map((stat) => (
+          {stats.map((stat) => (
             <Link
               key={stat.label}
               href={stat.href}
               className="rounded-xl p-4 transition-colors hover:bg-gray-50 sm:first:pl-0 sm:last:pr-0"
             >
               <p className="text-sm text-gray-500">{stat.label}</p>
-              <p className="text-2xl font-semibold text-gray-900 mt-1">{stat.value}</p>
+              {loading ? (
+                <>
+                  <span className="sr-only">Loading</span>
+                  <Skeleton className="mt-2 h-7 w-14" />
+                </>
+              ) : (
+                <p className="text-2xl font-semibold text-gray-900 mt-1">{stat.value}</p>
+              )}
             </Link>
           ))}
         </div>

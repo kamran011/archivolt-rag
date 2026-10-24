@@ -15,7 +15,7 @@ const STRATEGIES: Array<RetrievalStrategy | "auto"> = [
 ];
 
 function verdictClass(verdict: string | null): string {
-  if (!verdict) return "text-gray-400";
+  if (!verdict) return "text-gray-500";
   if (verdict.startsWith("dropped") || verdict.startsWith("skipped")) return "text-red-600";
   if (verdict === "kept" || verdict === "in context") return "text-green-600";
   return "text-gray-500";
@@ -26,11 +26,11 @@ function ChunkRow({ chunk, rank }: { chunk: DebugChunk; rank: number }) {
   return (
     <li className={`px-4 py-3 ${muted ? "bg-gray-50 opacity-70" : ""}`}>
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-gray-400 w-5">{rank}</span>
+        <span className="text-gray-500 w-5">{rank}</span>
         <span className="font-medium text-gray-900 truncate">{chunk.document_title}</span>
-        {chunk.page !== null && <span className="text-gray-400">p.{chunk.page}</span>}
+        {chunk.page !== null && <span className="text-gray-500">p.{chunk.page}</span>}
         <span className="ml-auto font-mono text-gray-700">{chunk.score.toFixed(3)}</span>
-        {chunk.tokens !== null && <span className="text-gray-400">{chunk.tokens} tok</span>}
+        {chunk.tokens !== null && <span className="text-gray-500">{chunk.tokens} tok</span>}
         {chunk.authority_tier !== "standard" && (
           <span className="rounded bg-indigo-50 text-indigo-700 px-1.5 py-0.5">
             {chunk.authority_tier}
@@ -61,11 +61,11 @@ function StageCard({ stage }: { stage: DebugStage }) {
         className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary"
       >
         <span className="font-medium text-sm text-gray-900 capitalize">{stage.name}</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-500">
           {stage.chunks.length} chunks · {stage.duration_ms} ms
         </span>
         {stage.note && <span className="text-xs text-gray-500 truncate">{stage.note}</span>}
-        <span className="ml-auto text-gray-400 text-xs">{open ? "Hide" : "Show"}</span>
+        <span className="ml-auto text-gray-500 text-xs">{open ? "Hide" : "Show"}</span>
       </button>
       {open && stage.chunks.length > 0 && (
         <ul className="divide-y divide-gray-100 border-t border-gray-100">
@@ -130,8 +130,9 @@ export default function RetrievalDebuggerPage() {
 
       <form onSubmit={run} className="bg-bg-white rounded-2xl border border-border p-5 space-y-4">
         <div>
-          <label className="text-xs font-medium text-gray-500">Question</label>
+          <label htmlFor="debug-query" className="text-xs font-medium text-gray-500">Question</label>
           <input
+            id="debug-query"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="How long do customers have to request a refund?"
@@ -144,8 +145,9 @@ export default function RetrievalDebuggerPage() {
         </div>
         <div className="flex items-end gap-4">
           <div>
-            <label className="text-xs font-medium text-gray-500">Strategy</label>
+            <label htmlFor="debug-strategy" className="text-xs font-medium text-gray-500">Strategy</label>
             <select
+              id="debug-strategy"
               value={strategy}
               onChange={(e) => setStrategy(e.target.value as RetrievalStrategy | "auto")}
               className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -168,7 +170,7 @@ export default function RetrievalDebuggerPage() {
       </form>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}

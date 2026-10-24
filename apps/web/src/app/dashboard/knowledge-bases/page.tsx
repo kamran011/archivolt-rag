@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useOrganization } from "@/providers/OrganizationProvider";
@@ -26,9 +27,18 @@ export default function KnowledgeBasesPage() {
       </div>
 
       {orgLoading || loading ? (
-        <div className="bg-bg-white rounded-2xl border border-border p-12 text-center text-gray-400 text-sm">
-          Loading…
-        </div>
+        <SkeletonRegion label="Loading knowledge bases" className="rounded-2xl border border-border bg-bg-white p-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-border bg-bg p-4">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="mt-3 h-3 w-full" />
+                <Skeleton className="mt-2 h-3 w-1/2" />
+                <Skeleton className="mt-4 h-3 w-1/3" />
+              </div>
+            ))}
+          </div>
+        </SkeletonRegion>
       ) : !currentOrg ? (
         <div className="bg-bg-white rounded-2xl border border-border p-12 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint">
@@ -48,7 +58,7 @@ export default function KnowledgeBasesPage() {
           </Link>
         </div>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 text-sm">
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 text-sm">
           {error}
         </div>
       ) : knowledgeBases.length === 0 ? (
@@ -82,7 +92,7 @@ export default function KnowledgeBasesPage() {
                 {kb.description && (
                   <p className="text-gray-500 text-sm mt-1 line-clamp-2">{kb.description}</p>
                 )}
-                <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
                   <span>{kb.document_count} documents</span>
                   <span>·</span>
                   <span>{kb.chunk_strategy === "structure_aware" ? "Structure-aware" : "Fixed"}</span>

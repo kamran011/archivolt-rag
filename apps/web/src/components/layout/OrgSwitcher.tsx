@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useOrganization } from "@/providers/OrganizationProvider";
@@ -39,6 +40,7 @@ export default function OrgSwitcher() {
   const { organizations, currentOrg, setCurrentOrgId, loading } = useOrganization();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -46,7 +48,10 @@ export default function OrgSwitcher() {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -56,7 +61,14 @@ export default function OrgSwitcher() {
     };
   }, [open]);
 
-  if (loading) return <div className="text-sm text-gray-400">Loading…</div>;
+  if (loading) {
+    return (
+      <SkeletonRegion label="Loading workspace" className="flex items-center gap-2 px-2 py-1.5">
+        <Skeleton className="h-7 w-7" />
+        <Skeleton className="h-4 w-32" />
+      </SkeletonRegion>
+    );
+  }
 
   if (!currentOrg) {
     return (
@@ -74,9 +86,9 @@ export default function OrgSwitcher() {
   return (
     <div ref={ref} className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => canSwitch && setOpen((o) => !o)}
-        aria-haspopup={canSwitch ? "menu" : undefined}
         aria-expanded={canSwitch ? open : undefined}
         className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-800 transition-colors ${
           canSwitch ? "cursor-pointer hover:bg-gray-50" : "cursor-default"
@@ -89,10 +101,9 @@ export default function OrgSwitcher() {
 
       {canSwitch && open && (
         <div
-          role="menu"
           className="absolute left-0 top-[calc(100%+6px)] z-50 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
         >
-          <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
             Workspaces
           </p>
           {organizations.map((org) => {
@@ -101,7 +112,7 @@ export default function OrgSwitcher() {
               <button
                 key={org.id}
                 type="button"
-                role="menuitem"
+                aria-current={active ? "true" : undefined}
                 onClick={() => {
                   setCurrentOrgId(org.id);
                   setOpen(false);

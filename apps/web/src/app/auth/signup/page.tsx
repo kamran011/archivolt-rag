@@ -40,7 +40,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-bg">
+      <main id="main-content" className="min-h-screen flex items-center justify-center bg-bg">
         <div className="w-full max-w-md text-center">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint">
@@ -56,12 +56,12 @@ export default function SignupPage() {
             </p>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-bg">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
@@ -136,6 +136,6 @@ export default function SignupPage() {
           </p>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

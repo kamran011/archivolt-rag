@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+import AccountMenu from "@/components/layout/AccountMenu";
 import { useConversations } from "@/hooks/useConversations";
 import { useOrganization } from "@/providers/OrganizationProvider";
 
@@ -94,25 +96,28 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      aria-current={active ? "page" : undefined}
       className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
         active
-          ? "text-primary font-semibold"
-          : "text-gray-500 font-medium hover:bg-gray-50 hover:text-gray-800"
+          ? "bg-white/[0.06] text-[#c4b5fd] font-semibold"
+          : "text-white/60 font-medium hover:bg-white/[0.06] hover:text-white"
       }`}
     >
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-primary" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-[#a78bfa]" />
       )}
-      <span className={active ? "text-primary" : ""}>{item.icon}</span>
+      <span className={active ? "text-[#a78bfa]" : ""}>{item.icon}</span>
       {item.label}
     </Link>
   );
 }
 
 export default function Sidebar({
+  user,
   open = false,
   onClose,
 }: {
+  user: User;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -124,6 +129,15 @@ export default function Sidebar({
   const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   const chatActive = pathname.startsWith("/dashboard/chat");
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose?.();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
 
   // Close the mobile drawer whenever navigation happens.
   useEffect(() => {
@@ -142,25 +156,25 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 bg-bg border-r border-gray-200 flex flex-col transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 bg-[#0d0a1f] border-r border-white/[0.08] flex flex-col transition-[transform,visibility] duration-200 ease-out lg:visible lg:static lg:translate-x-0 ${
+          open ? "visible translate-x-0" : "invisible -translate-x-full"
         }`}
       >
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-gray-100">
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-white/[0.08]">
           <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="shrink-0" aria-hidden>
-            <rect x="4" y="18" width="8" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.55"/>
-            <rect x="4" y="21.5" width="6" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.4"/>
-            <rect x="4" y="25" width="4" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.25"/>
-            <polygon points="20,5 24,16.5 21.2,16.5 24,26 16,16.5 19,16.5" fill="var(--primary)"/>
-            <circle cx="12.5" cy="11.5" r="3.2" fill="none" stroke="var(--primary)" strokeWidth="1.8"/>
-            <line x1="14.8" y1="13.8" x2="17.5" y2="16.5" stroke="var(--primary)" strokeWidth="1.8" strokeLinecap="round"/>
+            <rect x="4" y="18" width="8" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.55"/>
+            <rect x="4" y="21.5" width="6" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.4"/>
+            <rect x="4" y="25" width="4" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.25"/>
+            <polygon points="20,5 24,16.5 21.2,16.5 24,26 16,16.5 19,16.5" fill="#a78bfa"/>
+            <circle cx="12.5" cy="11.5" r="3.2" fill="none" stroke="#a78bfa" strokeWidth="1.8"/>
+            <line x1="14.8" y1="13.8" x2="17.5" y2="16.5" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          <span className="text-lg font-bold text-gray-900 tracking-tight flex-1">Ragix</span>
+          <span className="text-lg font-bold text-white tracking-tight flex-1">Ragix</span>
           <button
             type="button"
             aria-label="Close navigation"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700 lg:hidden"
+            className="cursor-pointer rounded-lg p-1.5 text-white/50 hover:bg-white/[0.06] hover:text-white lg:hidden"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -168,7 +182,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav aria-label="Main" className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {/* Nav items above Chat */}
           {navItems.slice(0, 2).map((item) => {
             const active =
@@ -183,23 +197,24 @@ export default function Sidebar({
             <div className="flex items-center gap-1">
               <Link
                 href="/dashboard/chat"
+                aria-current={chatActive ? "page" : undefined}
                 className={`relative flex flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
                   chatActive
-                    ? "text-primary font-semibold"
-                    : "text-gray-500 font-medium hover:bg-gray-50 hover:text-gray-800"
+                    ? "bg-white/[0.06] text-[#c4b5fd] font-semibold"
+                    : "text-white/60 font-medium hover:bg-white/[0.06] hover:text-white"
                 }`}
               >
                 {chatActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-primary" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[22px] w-[3px] rounded-r-full bg-[#a78bfa]" />
                 )}
-                <span className={chatActive ? "text-primary" : ""}>{CHAT_ICON}</span>
+                <span className={chatActive ? "text-[#a78bfa]" : ""}>{CHAT_ICON}</span>
                 Chat
               </Link>
               <button
                 type="button"
                 onClick={() => router.push("/dashboard/chat")}
                 aria-label="New conversation"
-                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-primary"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-2 focus-visible:outline-[#a78bfa]"
               >
                 {NEW_CHAT_ICON}
               </button>
@@ -207,7 +222,7 @@ export default function Sidebar({
 
             {/* Recent conversations */}
             {conversations.length > 0 && (
-              <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-gray-200 pl-3">
+              <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-white/[0.1] pl-3">
                 {conversations.slice(0, 12).map((conv) => {
                   const href = `/dashboard/chat/${conv.id}`;
                   const active = pathname === href;
@@ -215,11 +230,12 @@ export default function Sidebar({
                     <li key={conv.id}>
                       <Link
                         href={href}
+                        aria-current={active ? "page" : undefined}
                         title={conv.title ?? "Untitled conversation"}
                         className={`block truncate rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${
                           active
-                            ? "bg-gray-50 font-semibold text-primary"
-                            : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                            ? "bg-white/[0.06] font-semibold text-[#c4b5fd]"
+                            : "text-white/55 hover:bg-white/[0.06] hover:text-white"
                         }`}
                       >
                         {conv.title ?? "Untitled conversation"}
@@ -237,6 +253,10 @@ export default function Sidebar({
             return <NavLink key={item.href} item={item} active={active} />;
           })}
         </nav>
+
+        <div className="hidden border-t border-white/[0.08] p-3 lg:block">
+          <AccountMenu user={user} variant="sidebar" />
+        </div>
       </aside>
     </>
   );

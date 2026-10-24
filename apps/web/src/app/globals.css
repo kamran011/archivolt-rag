@@ -19,7 +19,7 @@
   --bg: #f4f5f8;
   --bg-white: #fff;
   --text: #1b2559;
-  --text-muted: #718096;
+  --text-muted: #5f6b82;
   --border: #e4e6ec;
 
   --background: var(--bg-white);
@@ -44,7 +44,7 @@
   --color-gray-200: #e4e6ec;
   --color-gray-300: #cbd5e0;
   --color-gray-400: #a0aec0;
-  --color-gray-500: #718096;
+  --color-gray-500: #5f6b82;
   --color-gray-600: #4a5568;
   --color-gray-700: #2d3748;
   --color-gray-800: #1b2559;
@@ -89,4 +89,39 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+aside :focus-visible {
+  outline-color: #a78bfa;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e7e9ef 25%, #f4f5f9 37%, #e7e9ef 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

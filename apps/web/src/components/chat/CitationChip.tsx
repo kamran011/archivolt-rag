@@ -107,7 +107,7 @@ export default function CitationChip({
             </div>
             {external && (
               <p className="text-[10px] font-medium text-amber-800 mb-1">
-                External web source — lower authority than your knowledge base
+                External web source, lower authority than your knowledge base
               </p>
             )}
             <p className="text-xs text-text-muted line-clamp-4">{citation.content}</p>

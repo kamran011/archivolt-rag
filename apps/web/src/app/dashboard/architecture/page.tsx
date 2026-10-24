@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
@@ -73,11 +74,18 @@ function Box({ stage, n }: { stage: Stage; n: number }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="rounded-xl border border-border bg-bg p-4">
       <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
+      {loading ? (
+        <>
+          <span className="sr-only">Loading</span>
+          <Skeleton className="mt-2 h-6 w-16" />
+        </>
+      ) : (
+        <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
+      )}
     </div>
   );
 }
@@ -95,7 +103,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 export default function ArchitecturePage() {
   const { currentOrg } = useOrganization();
   const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
-  const { knowledgeBases } = useKnowledgeBases();
+  const { knowledgeBases, loading: kbLoading } = useKnowledgeBases();
   const usage = useApiResource<UsageSummary>(
     currentOrg && isAdmin ? "/api/v1/analytics/usage?days=30" : null,
     currentOrg?.id,
@@ -114,7 +122,7 @@ export default function ArchitecturePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">How Ragix works</h1>
         <p className="text-sm text-gray-500">
-          The pipeline behind every answer, with the guard at each step — and live numbers from this
+          The pipeline behind every answer, with the guard at each step, and live numbers from this
           organization.
         </p>
       </div>
@@ -122,17 +130,18 @@ export default function ArchitecturePage() {
       <div className="space-y-6">
         <Panel title="Live (last 30 days)">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Knowledge bases" value={String(knowledgeBases.length)} />
-            <Stat label="Documents" value={String(docs)} />
-            <Stat label="Answers" value={u ? String(u.total_answers) : "—"} />
+            <Stat label="Knowledge bases" value={String(knowledgeBases.length)} loading={kbLoading} />
+            <Stat label="Documents" value={String(docs)} loading={kbLoading} />
+            <Stat label="Answers" value={u ? String(u.total_answers) : "—"} loading={usage.loading} />
             <Stat
               label="Abstention rate"
               value={u?.abstention_rate != null ? `${(u.abstention_rate * 100).toFixed(1)}%` : "—"}
+              loading={usage.loading}
             />
-            <Stat label="Avg cost / answer" value={u?.avg_cost_usd != null ? `$${u.avg_cost_usd.toFixed(4)}` : "—"} />
-            <Stat label="Avg citations" value={u?.avg_citations != null ? u.avg_citations.toFixed(1) : "—"} />
-            <Stat label="Conflicts flagged" value={u ? String(u.conflicts_flagged) : "—"} />
-            <Stat label="Deep-research answers" value={u ? String(u.agentic_answers) : "—"} />
+            <Stat label="Avg cost / answer" value={u?.avg_cost_usd != null ? `$${u.avg_cost_usd.toFixed(4)}` : "—"} loading={usage.loading} />
+            <Stat label="Avg citations" value={u?.avg_citations != null ? u.avg_citations.toFixed(1) : "—"} loading={usage.loading} />
+            <Stat label="Conflicts flagged" value={u ? String(u.conflicts_flagged) : "—"} loading={usage.loading} />
+            <Stat label="Deep-research answers" value={u ? String(u.agentic_answers) : "—"} loading={usage.loading} />
           </div>
           {u && Object.keys(u.strategy_counts).length > 0 && (
             <p className="mt-3 text-xs text-gray-500">

@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { use, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -45,16 +46,21 @@ export default function DocumentInspectorPage({
     <div>
       <BackLink href={`/dashboard/knowledge-bases/${kbId}`} label="Documents" />
       <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-2xl font-semibold text-gray-900">{doc.data?.title ?? "Document"}</h1>
+        {doc.loading && !doc.data ? (
+          <Skeleton className="h-8 w-64" />
+        ) : (
+          <h1 className="text-2xl font-semibold text-gray-900">{doc.data?.title ?? "Document"}</h1>
+        )}
         {doc.data && <DocumentStatusBadge status={doc.data.status} />}
       </div>
-      {doc.error && <p className="text-sm text-red-600 mb-3">{doc.error}</p>}
+      {doc.error && <p role="alert" className="text-sm text-red-600 mb-3">{doc.error}</p>}
 
       <div className="flex gap-1 border-b border-gray-200 mb-5">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? "true" : undefined}
             className={`cursor-pointer px-3 py-2 text-sm -mb-px border-b-2 ${
               tab === t.id
                 ? "border-blue-600 text-blue-700 font-medium"
@@ -66,6 +72,16 @@ export default function DocumentInspectorPage({
         ))}
       </div>
 
+      {doc.loading && !doc.data && tab === "overview" && (
+        <SkeletonRegion label="Loading document" className="space-y-4 rounded-2xl border border-border bg-bg-white p-5">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex gap-6">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          ))}
+        </SkeletonRegion>
+      )}
       {doc.data && tab === "overview" && (
         <Overview
           key={doc.data.id}
@@ -168,7 +184,7 @@ function Overview({
             v{doc.version} {doc.is_current ? "(current)" : "(superseded)"}
           </dd>
         </dl>
-        {doc.error_message && <p className="text-red-600 text-xs">{doc.error_message}</p>}
+        {doc.error_message && <p role="alert" className="text-red-600 text-xs">{doc.error_message}</p>}
       </section>
 
       <section className="bg-bg-white rounded-2xl border border-border p-5 text-sm space-y-3">
@@ -212,7 +228,7 @@ function Overview({
             disabled={!canManage}
             onChange={(e) => setRestricted(e.target.checked)}
           />
-          Restricted — only admins and explicitly granted users can see it in search and answers
+          Restricted: only admins and explicitly granted users can see it in search and answers
         </label>
         {canManage ? (
           <div className="flex items-center gap-3">
@@ -226,14 +242,14 @@ function Overview({
             {msg && <span className="text-xs text-gray-500">{msg}</span>}
           </div>
         ) : (
-          <p className="text-xs text-gray-400">Only admins can change these.</p>
+          <p className="text-xs text-gray-500">Only admins can change these.</p>
         )}
       </section>
 
       {canManage && doc.restricted && (
         <section className="bg-bg-white rounded-2xl border border-border p-5 text-sm md:col-span-2">
           <h2 className="font-medium text-gray-900 mb-2">Who can read this document</h2>
-          {access.error && <p className="text-xs text-red-600">{access.error}</p>}
+          {access.error && <p role="alert" className="text-xs text-red-600">{access.error}</p>}
           <ul className="divide-y divide-gray-100 mb-3">
             {(access.data ?? []).map((u) => (
               <li key={u} className="flex items-center justify-between py-1.5">
@@ -244,7 +260,7 @@ function Overview({
               </li>
             ))}
             {(access.data ?? []).length === 0 && (
-              <li className="py-1.5 text-xs text-gray-400">Only admins can see it right now.</li>
+              <li className="py-1.5 text-xs text-gray-500">Only admins can see it right now.</li>
             )}
           </ul>
           <div className="flex gap-2">
@@ -278,9 +294,19 @@ function Chunks({ base, orgId }: { base: string; orgId: string | undefined }) {
   const total = page.data?.total ?? 0;
   return (
     <div>
-      {page.error && <p className="text-sm text-red-600 mb-2">{page.error}</p>}
-      {page.loading && <p className="text-sm text-gray-400">Loading…</p>}
-      <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
+      {page.error && <p role="alert" className="text-sm text-red-600 mb-2">{page.error}</p>}
+      {page.loading && !page.data && (
+        <SkeletonRegion label="Loading chunks" className="space-y-3 rounded-2xl border border-border bg-bg-white p-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-bg p-4">
+              <Skeleton className="h-3 w-40" />
+              <Skeleton className="mt-3 h-3 w-full" />
+              <Skeleton className="mt-2 h-3 w-5/6" />
+            </div>
+          ))}
+        </SkeletonRegion>
+      )}
+      <div className={`rounded-2xl border border-border bg-bg-white p-4 space-y-3 ${page.loading && !page.data ? "hidden" : ""}`}>
         {(page.data?.items ?? []).map((c) => {
           const flags = (c.metadata.injection_risk_flags as string[] | undefined) ?? [];
           const chunking = c.metadata.chunking as
@@ -337,7 +363,7 @@ function NodeView({ node }: { node: TreeNode }) {
     <li>
       <div className="py-1 text-sm">
         <span className="text-gray-900">{node.title}</span>
-        <span className="ml-2 text-xs text-gray-400">
+        <span className="ml-2 text-xs text-gray-500">
           {node.chunk_indices.length} chunk{node.chunk_indices.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -354,8 +380,17 @@ function NodeView({ node }: { node: TreeNode }) {
 
 function Outline({ base, orgId }: { base: string; orgId: string | undefined }) {
   const tree = useApiResource<DocumentTree>(orgId ? `${base}/tree` : null, orgId, "Failed to load outline");
-  if (tree.error) return <p className="text-sm text-red-600">{tree.error}</p>;
-  if (tree.loading) return <p className="text-sm text-gray-400">Loading…</p>;
+  if (tree.error) return <p role="alert" className="text-sm text-red-600">{tree.error}</p>;
+  if (tree.loading) {
+    return (
+      <SkeletonRegion label="Loading outline" className="space-y-3 rounded-2xl border border-border bg-bg-white p-4">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="ml-4 h-4 w-2/5" />
+        <Skeleton className="ml-4 h-4 w-1/3" />
+        <Skeleton className="h-4 w-3/5" />
+      </SkeletonRegion>
+    );
+  }
   const nodes = tree.data?.nodes ?? [];
   if (nodes.length === 0) {
     return <p className="text-sm text-gray-500">This document has no heading outline.</p>;
@@ -371,15 +406,27 @@ function Outline({ base, orgId }: { base: string; orgId: string | undefined }) {
 
 function Summaries({ base, orgId }: { base: string; orgId: string | undefined }) {
   const s = useApiResource<DocumentSummaries>(orgId ? `${base}/summaries` : null, orgId, "Failed to load summaries");
-  if (s.error) return <p className="text-sm text-red-600">{s.error}</p>;
-  if (s.loading) return <p className="text-sm text-gray-400">Loading…</p>;
+  if (s.error) return <p role="alert" className="text-sm text-red-600">{s.error}</p>;
+  if (s.loading) {
+    return (
+      <SkeletonRegion label="Loading summaries" className="space-y-3 rounded-2xl border border-border bg-bg-white p-4">
+        {[0, 1].map((i) => (
+          <div key={i} className="rounded-xl border border-border bg-bg p-4">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="mt-3 h-4 w-1/2" />
+            <Skeleton className="mt-2 h-3 w-full" />
+          </div>
+        ))}
+      </SkeletonRegion>
+    );
+  }
   const items = s.data?.items ?? [];
   if (items.length === 0) return <p className="text-sm text-gray-500">No summaries were generated.</p>;
   return (
     <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
       {items.map((i) => (
         <article key={`${i.level}-${i.node_id ?? "doc"}`} className="rounded-xl border border-border bg-bg p-4">
-          <p className="text-xs uppercase text-gray-400 mb-1">{i.level}</p>
+          <p className="text-xs uppercase text-gray-500 mb-1">{i.level}</p>
           <h3 className="text-sm font-medium text-gray-900">{i.title}</h3>
           <p className="text-sm text-gray-600 mt-1">{i.summary}</p>
         </article>
@@ -400,8 +447,19 @@ function Versions({
   currentId: string;
 }) {
   const v = useApiResource<Document[]>(orgId ? `${base}/versions` : null, orgId, "Failed to load versions");
-  if (v.error) return <p className="text-sm text-red-600">{v.error}</p>;
-  if (v.loading) return <p className="text-sm text-gray-400">Loading…</p>;
+  if (v.error) return <p role="alert" className="text-sm text-red-600">{v.error}</p>;
+  if (v.loading) {
+    return (
+      <SkeletonRegion label="Loading versions" className="rounded-2xl border border-border bg-bg-white divide-y divide-gray-100">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center justify-between px-4 py-3">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        ))}
+      </SkeletonRegion>
+    );
+  }
   return (
     <ul className="bg-bg-white rounded-2xl border border-border divide-y divide-gray-100">
       {(v.data ?? []).map((d) => (

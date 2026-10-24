@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
@@ -20,13 +21,19 @@ export default function KBSelector({ selectedIds, onChange }: KBSelectorProps) {
   }
 
   if (loading) {
-    return <div className="text-xs text-gray-400">Loading knowledge bases…</div>;
+    return (
+      <SkeletonRegion label="Loading knowledge bases" className="flex gap-2">
+        <Skeleton className="h-6 w-24 rounded-full" />
+        <Skeleton className="h-6 w-28 rounded-full" />
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </SkeletonRegion>
+    );
   }
 
   if (knowledgeBases.length === 0) {
     return (
-      <div className="text-xs text-gray-400">
-        No knowledge bases yet —{" "}
+      <div className="text-xs text-gray-500">
+        No knowledge bases yet.{" "}
         <Link href="/dashboard/knowledge-bases/new" className="text-blue-600 hover:underline">
           create one
         </Link>

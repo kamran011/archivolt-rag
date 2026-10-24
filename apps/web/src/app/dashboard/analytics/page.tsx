@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useOrganization } from "@/providers/OrganizationProvider";
@@ -14,7 +15,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
     <div className="p-4">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="text-2xl font-semibold text-gray-900 mt-1">{value}</p>
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+      {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -84,6 +85,7 @@ export default function AnalyticsPage() {
             <button
               key={r}
               onClick={() => selectRange(r)}
+              aria-pressed={days === r}
               className={`cursor-pointer px-3 py-1.5 ${days === r ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
             >
               {r}d
@@ -93,9 +95,22 @@ export default function AnalyticsPage() {
       </div>
 
       {loading ? (
-        <div className="bg-bg-white rounded-2xl border border-border p-12 text-center text-gray-400 text-sm">
-          Loading…
-        </div>
+        <SkeletonRegion label="Loading analytics" className="space-y-6">
+          <Panel>
+            <div className="grid grid-cols-2 divide-y divide-gray-100 lg:grid-cols-4 lg:divide-y-0 lg:divide-x">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="p-4">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="mt-3 h-7 w-24" />
+                  <Skeleton className="mt-3 h-3 w-32" />
+                </div>
+              ))}
+            </div>
+          </Panel>
+          <Panel title="Answers per day">
+            <Skeleton className="h-32 w-full" />
+          </Panel>
+        </SkeletonRegion>
       ) : error ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-800 text-sm">
           {error}
@@ -144,7 +159,7 @@ export default function AnalyticsPage() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-between text-[11px] text-gray-400 mt-2">
+            <div className="flex justify-between text-[11px] text-gray-500 mt-2">
               <span>{data.daily[0]?.date}</span>
               <span>{data.daily[data.daily.length - 1]?.date}</span>
             </div>
@@ -166,14 +181,14 @@ export default function AnalyticsPage() {
                   </li>
                 )}
                 {Object.keys(data.strategy_counts).length === 0 && data.agentic_answers === 0 && (
-                  <li className="text-gray-400">No retrieval runs recorded yet.</li>
+                  <li className="text-gray-500">No retrieval runs recorded yet.</li>
                 )}
               </ul>
             </Panel>
 
             <Panel title="Average stage latency">
               {stages.length === 0 ? (
-                <p className="text-xs text-gray-400">No stage timings recorded yet.</p>
+                <p className="text-xs text-gray-500">No stage timings recorded yet.</p>
               ) : (
                 <ul className="space-y-2 text-xs">
                   {stages.map(([name, ms]) => (

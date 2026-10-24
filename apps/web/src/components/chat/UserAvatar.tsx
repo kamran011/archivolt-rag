@@ -11,7 +11,7 @@ export default function UserAvatar({ size = 32 }: { size?: number }) {
         width: size,
         height: size,
         fontSize: size * 0.34,
-        background: "linear-gradient(140deg, #c4b5fd, var(--primary))",
+        background: "linear-gradient(140deg, #7c52ff, #5726db)",
       }}
       aria-hidden
     >

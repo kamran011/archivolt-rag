@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
@@ -122,17 +123,25 @@ export default function ChatInterface({
           <KBSelector selectedIds={selectedKbIds} onChange={setSelectedKbIds} />
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <div ref={scrollRef} role="log" aria-label="Conversation" className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex flex-col items-center gap-2 text-text-muted">
-                <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <span className="text-sm">Loading conversation…</span>
+            <SkeletonRegion label="Loading conversation" className="space-y-6">
+              <div className="flex justify-end">
+                <Skeleton className="h-10 w-1/2 rounded-2xl" />
               </div>
-            </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+              <div className="flex justify-end">
+                <Skeleton className="h-10 w-2/5 rounded-2xl" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            </SkeletonRegion>
           ) : messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center">
               <div>

@@ -63,9 +63,9 @@ export default function DocumentUploader({ onUpload }: DocumentUploaderProps) {
         <p className="text-sm text-gray-600">
           {uploading ? "Uploading…" : "Drag & drop files, or click to browse"}
         </p>
-        <p className="text-xs text-gray-400 mt-1">PDF, DOCX, Markdown, TXT, HTML, CSV, JSON</p>
+        <p className="text-xs text-gray-500 mt-1">PDF, DOCX, Markdown, TXT, HTML, CSV, JSON</p>
       </div>
-      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+      {error && <p role="alert" className="text-red-600 text-xs mt-2">{error}</p>}
     </div>
   );
 }

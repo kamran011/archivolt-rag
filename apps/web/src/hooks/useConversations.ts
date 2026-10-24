@@ -15,7 +15,7 @@ export interface ConversationSummary {
 export function useConversations() {
   const { currentOrg } = useOrganization();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {
     if (!currentOrg) return;

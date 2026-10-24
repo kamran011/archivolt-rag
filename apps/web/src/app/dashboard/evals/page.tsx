@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton, SkeletonRegion } from "@/components/ui/Skeleton";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -162,7 +163,7 @@ export default function EvalLabPage() {
         </p>
       </div>
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -297,7 +298,7 @@ export default function EvalLabPage() {
             </button>
             {configCount > 8 && <span className="text-xs text-red-600">At most 8 at a time.</span>}
             {!retrievalOnly && (
-              <span className="text-xs text-gray-400">Answer runs call the LLM and cost money.</span>
+              <span className="text-xs text-gray-500">Answer runs call the LLM and cost money.</span>
             )}
           </div>
         </div>
@@ -314,15 +315,15 @@ export default function EvalLabPage() {
             Check regressions (first = baseline)
           </button>
         </div>
-        {runs.error && <p className="text-sm text-red-600">{runs.error}</p>}
+        {runs.error && <p role="alert" className="text-sm text-red-600">{runs.error}</p>}
         <table className="w-full text-sm">
           <thead className="text-xs uppercase text-gray-500">
             <tr>
-              <th className="w-8" />
-              <th className="text-left py-2 font-medium">Configuration</th>
-              <th className="text-left py-2 font-medium">Status</th>
-              <th className="text-left py-2 font-medium">Cases</th>
-              <th className="text-left py-2 font-medium">Started</th>
+              <th scope="col" className="w-8"><span className="sr-only">Select</span></th>
+              <th scope="col" className="text-left py-2 font-medium">Configuration</th>
+              <th scope="col" className="text-left py-2 font-medium">Status</th>
+              <th scope="col" className="text-left py-2 font-medium">Cases</th>
+              <th scope="col" className="text-left py-2 font-medium">Started</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -363,8 +364,15 @@ export default function EvalLabPage() {
             ))}
           </tbody>
         </table>
+        {runs.loading && !runs.data && (
+          <SkeletonRegion label="Loading runs" className="space-y-3 py-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-5 w-full" />
+            ))}
+          </SkeletonRegion>
+        )}
         {(runs.data ?? []).length === 0 && !runs.loading && (
-          <p className="text-sm text-gray-400 py-3">No runs yet.</p>
+          <p className="text-sm text-gray-500 py-3">No runs yet.</p>
         )}
       </section>
 
@@ -374,7 +382,7 @@ export default function EvalLabPage() {
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">
               <tr>
-                <th className="text-left py-2 font-medium">Metric</th>
+                <th scope="col" className="text-left py-2 font-medium">Metric</th>
                 {pickedRuns.map((r) => (
                   <th key={r.id} className="text-right py-2 font-medium pl-4">
                     {label(r.config)}
