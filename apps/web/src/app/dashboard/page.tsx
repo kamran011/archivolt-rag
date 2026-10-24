@@ -53,7 +53,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+      {!loading && knowledgeBases.length === 0 && <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
         <h2 className="font-medium text-blue-900 mb-1">Get started</h2>
         <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
           <li>
@@ -69,7 +69,7 @@ export default function DashboardPage() {
             with your documents
           </li>
         </ol>
-      </div>
+      </div>}
     </div>
   );
 }

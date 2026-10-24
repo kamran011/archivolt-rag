@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardChrome from "@/components/layout/DashboardChrome";
 import { OrganizationProvider } from "@/providers/OrganizationProvider";
+import { CurrentUserProvider } from "@/providers/CurrentUserProvider";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -19,8 +20,10 @@ export default async function DashboardLayout({
   if (!user) redirect("/auth/login");
 
   return (
-    <OrganizationProvider>
-      <DashboardChrome user={user}>{children}</DashboardChrome>
-    </OrganizationProvider>
+    <CurrentUserProvider>
+      <OrganizationProvider>
+        <DashboardChrome user={user}>{children}</DashboardChrome>
+      </OrganizationProvider>
+    </CurrentUserProvider>
   );
 }

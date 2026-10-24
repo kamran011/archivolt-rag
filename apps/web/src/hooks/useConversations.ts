@@ -16,21 +16,26 @@ export function useConversations() {
   const { currentOrg } = useOrganization();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const orgId = currentOrg?.id;
 
   const refresh = useCallback(() => {
-    if (!currentOrg) return;
+    if (!orgId) return;
     setLoading(true);
+    setError(null);
     api
-      .get<ConversationSummary[]>("/api/v1/chat/conversations", currentOrg.id)
-      .then(setConversations)
-      .catch(() => {})
+      .get<ConversationSummary[]>("/api/v1/chat/conversations", orgId)
+      .then((data) => { setConversations(data); setError(null); })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Failed to load conversations");
+      })
       .finally(() => setLoading(false));
-  }, [currentOrg]);
+  }, [orgId]);
 
   useEffect(() => {
-// eslint-disable-next-line react-hooks/set-state-in-effect
-        refresh();
+    refresh();
   }, [refresh]);
 
-  return { conversations, loading, refresh };
+  return { conversations, loading, error, refresh };
 }

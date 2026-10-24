@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/hooks/useChat";
 import { safeHttpUrl } from "@/lib/safeUrl";
 import type { AbstentionReason, Citation, ClaimStatus } from "@/lib/types";
+import { useOrganization } from "@/providers/OrganizationProvider";
 
 const ABSTENTION_COPY: Record<AbstentionReason, string> = {
   insufficient_evidence: "The knowledge base did not contain enough relevant evidence.",
@@ -237,6 +238,8 @@ export default function EvidencePanel({
   onClose?: () => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const { currentOrg } = useOrganization();
+  const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
 
   useEffect(() => {
     if (highlightedSource == null) return;
@@ -374,7 +377,7 @@ export default function EvidencePanel({
               </Section>
             )}
 
-            {!(message.streaming && !message.content) && <BuiltDetails m={message} />}
+            {isAdmin && !(message.streaming && !message.content) && <BuiltDetails m={message} />}
           </>
         )}
       </div>

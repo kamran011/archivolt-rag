@@ -34,7 +34,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   return (
     <div className="flex items-end gap-3.5">
-      <div className="flex-1 bg-bg-white border border-border rounded-full px-4 py-3">
+      <div className="flex-1 bg-bg-white border border-border rounded-full px-4 py-3 transition-colors focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden">
         <textarea
           ref={textareaRef}
           value={value}
@@ -44,7 +44,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           rows={1}
           aria-label="Message input"
           placeholder="Type your message…"
-          className="w-full resize-none bg-transparent border-none outline-none text-sm text-text placeholder:text-text-muted max-h-32 disabled:opacity-50"
+          className="w-full resize-none bg-transparent border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none text-sm text-text placeholder:text-text-muted max-h-32 disabled:opacity-50"
+          style={{ outline: "none", boxShadow: "none" }}
         />
       </div>
       <button

@@ -134,15 +134,19 @@ export function useChat(
   // selected" (and therefore a disabled send button) when reopening a chat.
   const [restoredKbId, setRestoredKbId] = useState<string | null>(null);
 
-  // Load existing conversation on mount
+  const orgId = currentOrg?.id;
+
+  // Load existing conversation on mount — depend on orgId (primitive) not
+  // currentOrg object, so a focus-triggered org refresh that returns the
+  // same org doesn't re-fetch the conversation.
   useEffect(() => {
-    if (!initialConversationId || !currentOrg) return;
+    if (!initialConversationId || !orgId) return;
     let cancelled = false;
     setLoading(true);
     api
       .get<ApiConversationDetail>(
         `/api/v1/chat/conversations/${initialConversationId}`,
-        currentOrg.id
+        orgId
       )
       .then((conv) => {
         if (cancelled) return;
@@ -159,7 +163,7 @@ export function useChat(
     return () => {
       cancelled = true;
     };
-  }, [initialConversationId, currentOrg]);
+  }, [initialConversationId, orgId]);
 
   const sendMessage = useCallback(
     async (content: string) => {

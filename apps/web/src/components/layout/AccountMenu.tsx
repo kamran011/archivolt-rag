@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { useOrganization } from "@/providers/OrganizationProvider";
 
 const AVATAR_BG = "linear-gradient(140deg, #7c52ff, #5726db)";
 
@@ -19,8 +20,11 @@ export default function AccountMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const initials = (user.email ?? "?").split("@")[0].slice(0, 2).toUpperCase();
-  const name = user.user_metadata?.full_name ?? "Account";
+  const { currentOrg } = useOrganization();
+  const emailPrefix = (user.email ?? "?").split("@")[0];
+  const initials = emailPrefix.slice(0, 2).toUpperCase();
+  const name = user.user_metadata?.full_name ?? emailPrefix;
+  const role = currentOrg?.role;
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -58,6 +62,7 @@ export default function AccountMenu({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={isSidebar ? undefined : "Account menu"}
+        title={isSidebar ? `${name}${role ? ` (${role})` : ""}\n${user.email}` : undefined}
         className={
           isSidebar
             ? "flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/[0.06]"
@@ -75,7 +80,14 @@ export default function AccountMenu({
               {initials}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-white">{name}</span>
+              <span className="flex items-center gap-1.5 truncate">
+                <span className="truncate text-sm font-medium text-white">{name}</span>
+                {role && (
+                  <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium capitalize text-white/50 bg-white/[0.08]">
+                    {role}
+                  </span>
+                )}
+              </span>
               <span className="block truncate text-xs text-white/60">{user.email}</span>
             </span>
             <svg

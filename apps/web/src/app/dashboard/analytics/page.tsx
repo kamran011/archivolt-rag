@@ -145,24 +145,32 @@ export default function AnalyticsPage() {
           </Panel>
 
           <Panel title="Answers per day">
-            <div className="flex items-end gap-1 h-32">
-              {data.daily.map((d) => (
-                <div
-                  key={d.date}
-                  className="flex-1 flex flex-col justify-end"
-                  title={`${d.date}: ${d.answers} answers, ${d.abstained} abstained, ${usd(d.cost_usd)}`}
-                >
-                  <div
-                    className="bg-blue-500 rounded-t"
-                    style={{ height: `${(d.answers / maxDaily) * 100}%` }}
-                  />
+            {data.daily.every((d) => d.answers === 0) ? (
+              <div className="flex h-32 items-center justify-center text-sm text-text-muted">
+                No answers recorded yet
+              </div>
+            ) : (
+              <>
+                <div className="relative flex items-end gap-0.5 h-32">
+                  {data.daily.map((d) => (
+                    <div
+                      key={d.date}
+                      className="flex-1 max-w-8 h-full flex flex-col justify-end"
+                      title={`${d.date}: ${d.answers} answers, ${d.abstained} abstained, ${usd(d.cost_usd)}`}
+                    >
+                      <div
+                        className="bg-primary/70 rounded-t transition-all"
+                        style={{ height: `${Math.max((d.answers / maxDaily) * 100, d.answers > 0 ? 2 : 0)}%` }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[11px] text-gray-500 mt-2">
-              <span>{data.daily[0]?.date}</span>
-              <span>{data.daily[data.daily.length - 1]?.date}</span>
-            </div>
+                <div className="flex justify-between text-[11px] text-gray-500 mt-2">
+                  <span>{data.daily[0]?.date}</span>
+                  <span>{data.daily[data.daily.length - 1]?.date}</span>
+                </div>
+              </>
+            )}
           </Panel>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

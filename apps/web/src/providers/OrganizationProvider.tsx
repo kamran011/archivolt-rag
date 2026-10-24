@@ -44,10 +44,16 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   }, [loading, organizations.length, pathname, router]);
 
-  // Re-fetch org list (and roles) whenever the tab regains focus, so a role change
-  // made in another tab or by another user propagates within seconds.
+  // Re-fetch org list (and roles) whenever the tab regains focus, throttled
+  // to at most once every 30 s to avoid cascading re-fetches in child hooks.
   useEffect(() => {
-    const onFocus = () => { void refresh(); };
+    let lastFetch = 0;
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFetch < 30_000) return;
+      lastFetch = now;
+      void refresh();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);

@@ -123,7 +123,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations } = useConversations();
+  const { conversations, error: conversationsError } = useConversations();
   const { currentOrg } = useOrganization();
   const isAdmin = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
@@ -221,6 +221,11 @@ export default function Sidebar({
             </div>
 
             {/* Recent conversations */}
+            {conversationsError && (
+              <p className="ml-5 mt-1 truncate pl-3 text-[11px] text-red-400/80">
+                {conversationsError}
+              </p>
+            )}
             {conversations.length > 0 && (
               <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-white/[0.1] pl-3">
                 {conversations.slice(0, 12).map((conv) => {

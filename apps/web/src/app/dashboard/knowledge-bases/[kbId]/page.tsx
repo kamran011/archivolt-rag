@@ -25,6 +25,7 @@ export default function KnowledgeBaseDetailPage({
 }) {
   const { kbId } = use(params);
   const { documents, loading, error, uploadDocument, deleteDocument } = useDocuments(kbId);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { currentOrg } = useOrganization();
   const canManage = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   const { data: kb, update: updateKb } = useApiResource<KnowledgeBase>(
@@ -100,9 +101,9 @@ export default function KnowledgeBaseDetailPage({
         <DocumentUploader onUpload={uploadDocument} />
       </div>
 
-      {error && (
+      {(error || deleteError) && (
         <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
-          {error}
+          {error ?? deleteError}
         </div>
       )}
 
@@ -186,7 +187,12 @@ export default function KnowledgeBaseDetailPage({
                       </Link>
                       <button
                         type="button"
-                        onClick={() => deleteDocument(doc.id)}
+                        onClick={() => {
+                          setDeleteError(null);
+                          deleteDocument(doc.id).catch((e: unknown) => {
+                            setDeleteError(e instanceof Error ? e.message : "Failed to delete document");
+                          });
+                        }}
                         title="Delete document"
                         aria-label="Delete document"
                         className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"

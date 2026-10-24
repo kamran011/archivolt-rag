@@ -115,6 +115,27 @@ aside :focus-visible {
   }
 }
 
+/* Slim primary-colored scrollbar (Webkit/Blink) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-300) transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
