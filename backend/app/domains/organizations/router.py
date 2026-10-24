@@ -153,6 +153,30 @@ async def list_invitations(
     return [OrgInvitationResponse.model_validate(i) for i in invites]
 
 
+@router.post("/{org_id}/invitations/{invite_id}/resend", status_code=204)
+async def resend_invitation(
+    org_id: uuid.UUID,
+    invite_id: uuid.UUID,
+    current_user: CurrentUser = Depends(
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    await org_service.resend_invitation(db, org_id, invite_id)
+
+
+@router.delete("/{org_id}/invitations/{invite_id}", status_code=204)
+async def revoke_invitation(
+    org_id: uuid.UUID,
+    invite_id: uuid.UUID,
+    current_user: CurrentUser = Depends(
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    await org_service.revoke_invitation(db, org_id, invite_id)
+
+
 @router.post("/invitations/{invite_id}/accept", response_model=OrgMemberResponse, status_code=201)
 async def accept_invitation(
     invite_id: uuid.UUID,

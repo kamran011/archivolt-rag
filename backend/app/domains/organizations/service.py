@@ -196,6 +196,44 @@ class OrganizationService:
         logger.info("invitation_sent", invite_id=str(invite.id), org_id=str(org_id), email=data.email)
         return invite
 
+    async def resend_invitation(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        invite_id: uuid.UUID,
+    ) -> OrgInvitation:
+        invite = await db.get(OrgInvitation, invite_id)
+        if not invite or invite.org_id != org_id:
+            raise NotFoundError("Invitation not found.")
+        if invite.accepted_at is not None:
+            raise ValidationError("This invitation has already been accepted.")
+
+        redirect_to = (
+            f"{settings.FRONTEND_URL}/invite/accept"
+            f"?invite={invite.id}&org={org_id}"
+        )
+        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        supabase.auth.admin.invite_user_by_email(
+            invite.email,
+            options={"redirect_to": redirect_to},
+        )
+        logger.info("invitation_resent", invite_id=str(invite.id), org_id=str(org_id), email=invite.email)
+        return invite
+
+    async def revoke_invitation(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        invite_id: uuid.UUID,
+    ) -> None:
+        invite = await db.get(OrgInvitation, invite_id)
+        if not invite or invite.org_id != org_id:
+            raise NotFoundError("Invitation not found.")
+        if invite.accepted_at is not None:
+            raise ValidationError("This invitation has already been accepted.")
+        await db.delete(invite)
+        logger.info("invitation_revoked", invite_id=str(invite.id), org_id=str(org_id))
+
     async def accept_invitation(
         self,
         db: AsyncSession,

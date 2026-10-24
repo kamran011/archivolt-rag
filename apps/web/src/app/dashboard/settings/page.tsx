@@ -272,12 +272,67 @@ export default function SettingsPage() {
 
         {canManage && invitations && invitations.length > 0 && (
           <div className="mt-5 border-t border-gray-100 pt-4">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Pending invitations</h3>
-            <ul className="space-y-1">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending invitations</h3>
+              <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
+                {invitations.length} awaiting
+              </span>
+            </div>
+            <ul className="space-y-2">
               {invitations.map((inv) => (
-                <li key={inv.id} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{inv.email}</span>
-                  <span className="text-xs text-gray-400 capitalize">{inv.role} · awaiting acceptance</span>
+                <li key={inv.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{inv.email}</p>
+                      <p className="text-xs text-gray-400 capitalize">{inv.role} · awaiting acceptance</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await api.post(
+                            `/api/v1/organizations/${org.id}/invitations/${inv.id}/resend`,
+                            {},
+                            org.id,
+                          );
+                        })
+                      }
+                      className="cursor-pointer flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Resend invitation email"
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Resend
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        if (!window.confirm(`Revoke invitation for ${inv.email}?`)) return;
+                        void run(async () => {
+                          await api.delete(
+                            `/api/v1/organizations/${org.id}/invitations/${inv.id}`,
+                            org.id,
+                          );
+                          await reloadInvitations();
+                        });
+                      }}
+                      className="cursor-pointer flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-xs text-gray-400 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Revoke invitation"
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Revoke
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
