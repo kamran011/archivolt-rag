@@ -114,7 +114,7 @@ export default function MessageBubble({
 
   if (message.abstained) {
     return (
-      <div className="flex items-start gap-2.5">
+      <div className="animate-fade-slide-up flex items-start gap-2.5">
         <ChatAvatar size={32} />
         <div>
           <AbstentionMessage content={message.content} />
@@ -126,7 +126,7 @@ export default function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex items-start justify-end gap-2.5">
+      <div className="animate-fade-slide-up flex items-start justify-end gap-2.5">
         <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-white">
           {message.content}
         </div>
@@ -136,7 +136,7 @@ export default function MessageBubble({
   }
 
   return (
-    <div className="flex items-start gap-2.5">
+    <div className="animate-fade-slide-up flex items-start gap-2.5">
       <ChatAvatar size={32} />
       <div className="max-w-[75%]">
       <div

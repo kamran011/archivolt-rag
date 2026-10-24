@@ -108,7 +108,7 @@ export default function AccountMenu({
 
       {open && (
         <div
-          className={`absolute z-50 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg ${
+          className={`animate-fade-slide-up absolute z-50 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg ${
             isSidebar ? "bottom-[calc(100%+8px)] left-0 right-0" : "right-0 top-[calc(100%+8px)] w-64"
           }`}
         >

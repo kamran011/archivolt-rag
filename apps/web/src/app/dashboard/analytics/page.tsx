@@ -152,15 +152,15 @@ export default function AnalyticsPage() {
             ) : (
               <>
                 <div className="relative flex items-end gap-0.5 h-32">
-                  {data.daily.map((d) => (
+                  {data.daily.map((d, i) => (
                     <div
                       key={d.date}
                       className="flex-1 max-w-8 h-full flex flex-col justify-end"
                       title={`${d.date}: ${d.answers} answers, ${d.abstained} abstained, ${usd(d.cost_usd)}`}
                     >
                       <div
-                        className="bg-primary/70 rounded-t transition-all"
-                        style={{ height: `${Math.max((d.answers / maxDaily) * 100, d.answers > 0 ? 2 : 0)}%` }}
+                        className="animate-grow-bar bg-primary/70 rounded-t"
+                        style={{ height: `${Math.max((d.answers / maxDaily) * 100, d.answers > 0 ? 2 : 0)}%`, animationDelay: `${i * 30}ms` }}
                       />
                     </div>
                   ))}

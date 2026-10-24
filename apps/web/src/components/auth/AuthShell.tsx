@@ -71,8 +71,8 @@ export default function AuthShell({ children }: { children: ReactNode }) {
 
           <ul className="space-y-4">
             {FEATURES.map((f) => (
-              <li key={f.text} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-[#a78bfa]">
+              <li key={f.text} className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-[#a78bfa]">
                   {f.icon}
                 </span>
                 <span className="text-sm text-white/70">{f.text}</span>

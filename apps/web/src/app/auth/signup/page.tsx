@@ -61,7 +61,7 @@ export default function SignupPage() {
 
   return (
     <AuthShell>
-      <main id="main-content">
+      <main id="main-content" className="animate-fade-slide-up">
         <div className="mb-7">
           <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
           <p className="mt-1 text-sm text-gray-500">Get started with Ragix for free</p>
@@ -69,7 +69,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="animate-shake rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}

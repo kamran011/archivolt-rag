@@ -9,7 +9,8 @@ import { useDocuments } from "@/hooks/useDocuments";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type { CagInfo, KnowledgeBase } from "@/lib/types";
 import DocumentStatusBadge from "@/components/documents/DocumentStatusBadge";
-import DocumentUploader from "@/components/documents/DocumentUploader";
+import { FileUpload } from "@/components/ui/file-upload";
+import { UndoPill } from "@/components/ui/undo-pill";
 import BackLink from "@/components/ui/BackLink";
 
 function formatBytes(bytes: number): string {
@@ -26,6 +27,7 @@ export default function KnowledgeBaseDetailPage({
   const { kbId } = use(params);
   const { documents, loading, error, uploadDocument, deleteDocument } = useDocuments(kbId);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const { currentOrg } = useOrganization();
   const canManage = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   const { data: kb, update: updateKb } = useApiResource<KnowledgeBase>(
@@ -58,6 +60,24 @@ export default function KnowledgeBaseDetailPage({
 
   return (
     <div>
+      {/* UndoPill — fixed at bottom-center, appears when a delete is pending */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center">
+        <UndoPill
+          open={pendingDelete !== null}
+          label={`"${pendingDelete?.title ?? "Document"}" deleted`}
+          duration={5}
+          onUndo={() => setPendingDelete(null)}
+          onExpire={() => {
+            if (!pendingDelete) return;
+            const id = pendingDelete.id;
+            setPendingDelete(null);
+            deleteDocument(id).catch((e: unknown) => {
+              setDeleteError(e instanceof Error ? e.message : "Failed to delete document");
+            });
+          }}
+        />
+      </div>
+
       <BackLink href="/dashboard/knowledge-bases" label="Knowledge Bases" />
 
       <h1 className="text-2xl font-semibold text-gray-900 mb-1">{kb?.name ?? "Documents"}</h1>
@@ -98,7 +118,7 @@ export default function KnowledgeBaseDetailPage({
       )}
 
       <div className="mb-8">
-        <DocumentUploader onUpload={uploadDocument} />
+        <FileUpload onUpload={uploadDocument} />
       </div>
 
       {(error || deleteError) && (
@@ -189,9 +209,7 @@ export default function KnowledgeBaseDetailPage({
                         type="button"
                         onClick={() => {
                           setDeleteError(null);
-                          deleteDocument(doc.id).catch((e: unknown) => {
-                            setDeleteError(e instanceof Error ? e.message : "Failed to delete document");
-                          });
+                          setPendingDelete({ id: doc.id, title: doc.title });
                         }}
                         title="Delete document"
                         aria-label="Delete document"

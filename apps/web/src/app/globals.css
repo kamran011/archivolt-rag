@@ -136,6 +136,26 @@ aside :focus-visible {
   scrollbar-color: var(--color-gray-300) transparent;
 }
 
+/* ─── Motion utilities ─────────────────────────────────────────────────────── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-7px); }
+  40%       { transform: translateX(7px); }
+  60%       { transform: translateX(-5px); }
+  80%       { transform: translateX(5px); }
+}
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes grow-bar {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+.animate-shake         { animation: shake 0.32s cubic-bezier(0.2,0,0,1); }
+.animate-fade-slide-up { animation: fade-slide-up 0.22s cubic-bezier(0.2,0,0,1) both; }
+.animate-grow-bar      { animation: grow-bar 0.4s cubic-bezier(0.2,0,0,1) both; transform-origin: bottom; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
