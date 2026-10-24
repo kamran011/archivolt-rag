@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useDocuments } from "@/hooks/useDocuments";
+import EmptyState from "@/components/ui/EmptyState";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type { CagInfo, KnowledgeBase } from "@/lib/types";
 import DocumentStatusBadge from "@/components/documents/DocumentStatusBadge";
@@ -142,8 +143,8 @@ export default function KnowledgeBaseDetailPage({
           ))}
         </SkeletonRegion>
       ) : documents.length === 0 ? (
-        <div className="bg-bg-white rounded-2xl border border-border p-10 text-center text-gray-500 text-sm">
-          No documents uploaded yet.
+        <div className="bg-bg-white rounded-2xl border border-border">
+          <EmptyState icon="document" title="No documents yet" description="Upload a PDF, DOCX, Markdown, or other supported file to get started." />
         </div>
       ) : (
         <div className="bg-bg-white rounded-2xl border border-border overflow-hidden">

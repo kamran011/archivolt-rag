@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import type { UsageSummary } from "@/lib/types";
+import EmptyState from "@/components/ui/EmptyState";
 
 const RANGES = [7, 30, 90];
 
@@ -116,8 +117,8 @@ export default function AnalyticsPage() {
           {error}
         </div>
       ) : data && data.total_answers === 0 ? (
-        <div className="bg-bg-white rounded-2xl border border-border p-12 text-center text-gray-500 text-sm">
-          No answers in the last {data.days} days.
+        <div className="bg-bg-white rounded-2xl border border-border">
+          <EmptyState icon="chart" title={`No answers in the last ${data.days} days`} description="Start a chat with one of your knowledge bases to see usage appear here." />
         </div>
       ) : data ? (
         <div className="space-y-6">
@@ -146,8 +147,8 @@ export default function AnalyticsPage() {
 
           <Panel title="Answers per day">
             {data.daily.every((d) => d.answers === 0) ? (
-              <div className="flex h-32 items-center justify-center text-sm text-text-muted">
-                No answers recorded yet
+              <div className="flex h-32 items-center justify-center">
+                <EmptyState icon="chart" title="No answers recorded yet" compact />
               </div>
             ) : (
               <>
@@ -196,7 +197,7 @@ export default function AnalyticsPage() {
 
             <Panel title="Average stage latency">
               {stages.length === 0 ? (
-                <p className="text-xs text-gray-500">No stage timings recorded yet.</p>
+                <EmptyState icon="chart" title="No stage timings yet" compact />
               ) : (
                 <ul className="space-y-2 text-xs">
                   {stages.map(([name, ms]) => (

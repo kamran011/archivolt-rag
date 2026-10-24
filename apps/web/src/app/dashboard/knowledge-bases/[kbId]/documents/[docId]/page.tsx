@@ -8,6 +8,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import DocumentStatusBadge from "@/components/documents/DocumentStatusBadge";
 import BackLink from "@/components/ui/BackLink";
+import EmptyState from "@/components/ui/EmptyState";
 import type {
   AuthorityTier,
   ChunkPage,
@@ -393,7 +394,7 @@ function Outline({ base, orgId }: { base: string; orgId: string | undefined }) {
   }
   const nodes = tree.data?.nodes ?? [];
   if (nodes.length === 0) {
-    return <p className="text-sm text-gray-500">This document has no heading outline.</p>;
+    return <EmptyState icon="document" title="No outline" description="This document has no heading structure." compact />;
   }
   return (
     <ul className="bg-bg-white rounded-2xl border border-border p-4">
@@ -421,7 +422,7 @@ function Summaries({ base, orgId }: { base: string; orgId: string | undefined })
     );
   }
   const items = s.data?.items ?? [];
-  if (items.length === 0) return <p className="text-sm text-gray-500">No summaries were generated.</p>;
+  if (items.length === 0) return <EmptyState icon="document" title="No summaries" description="Summaries are generated for documents with hierarchical section structure." compact />;
   return (
     <div className="rounded-2xl border border-border bg-bg-white p-4 space-y-3">
       {items.map((i) => (
