@@ -147,10 +147,13 @@ export default function Sidebar({
         }`}
       >
         <div className="h-16 flex items-center gap-2.5 px-5 border-b border-gray-100">
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="shrink-0">
-            <circle cx="14" cy="14" r="5" stroke="var(--primary)" strokeWidth="2.2" />
-            <circle cx="14" cy="14" r="9.5" stroke="var(--primary)" strokeWidth="2" opacity="0.55" />
-            <circle cx="14" cy="14" r="13" stroke="var(--primary)" strokeWidth="1.6" opacity="0.3" />
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="shrink-0" aria-hidden>
+            <rect x="4" y="18" width="8" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.55"/>
+            <rect x="4" y="21.5" width="6" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.4"/>
+            <rect x="4" y="25" width="4" height="1.6" rx="0.8" fill="var(--primary)" opacity="0.25"/>
+            <polygon points="20,5 24,16.5 21.2,16.5 24,26 16,16.5 19,16.5" fill="var(--primary)"/>
+            <circle cx="12.5" cy="11.5" r="3.2" fill="none" stroke="var(--primary)" strokeWidth="1.8"/>
+            <line x1="14.8" y1="13.8" x2="17.5" y2="16.5" stroke="var(--primary)" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
           <span className="text-lg font-bold text-gray-900 tracking-tight flex-1">Ragix</span>
           <button

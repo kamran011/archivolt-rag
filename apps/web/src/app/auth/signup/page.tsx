@@ -64,8 +64,19 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Ragix</h1>
-          <p className="text-gray-500 mt-2">Create your workspace</p>
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <svg width="36" height="36" viewBox="0 0 32 32" fill="none" aria-hidden>
+              <rect width="32" height="32" rx="7" fill="#0d0a1f"/>
+              <rect x="6" y="18" width="8" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.55"/>
+              <rect x="6" y="21.5" width="6" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.4"/>
+              <rect x="6" y="25" width="4" height="1.6" rx="0.8" fill="#c4b5fd" opacity="0.25"/>
+              <polygon points="20,7 24,18.5 21.2,18.5 24,28 16,18.5 19,18.5" fill="#a78bfa"/>
+              <circle cx="12.5" cy="11.5" r="2.8" fill="none" stroke="#a78bfa" strokeWidth="1.5"/>
+              <line x1="14.5" y1="13.5" x2="17" y2="16" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <h1 className="text-3xl font-bold text-gray-900">Ragix</h1>
+          </div>
+          <p className="text-gray-500">Create your workspace</p>
         </div>
 
         <form
