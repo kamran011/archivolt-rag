@@ -8,7 +8,6 @@ import {
   useReducedMotion,
   type Variants,
 } from "framer-motion";
-import { cn } from "@/lib/utils";
 
 export interface UndoPillProps {
   open: boolean;
@@ -203,11 +202,7 @@ export function UndoPill({
             }
           }}
           onKeyDown={handleKeyDown}
-          className={cn(
-            "pointer-events-auto inline-flex select-none items-center gap-2.5 rounded-full bg-neutral-900 py-2 pl-3 pr-2.5 text-sm text-white",
-            "shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_0px_rgba(0,0,0,0.04),0px_2px_4px_0px_rgba(0,0,0,0.04)]",
-            className,
-          )}
+          className={`pointer-events-auto inline-flex select-none items-center gap-2.5 rounded-full bg-neutral-900 py-2 pl-3 pr-2.5 text-sm text-white shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_2px_0px_rgba(0,0,0,0.04),0px_2px_4px_0px_rgba(0,0,0,0.04)]${className ? ` ${className}` : ""}`}
         >
           <span
             aria-hidden="true"
@@ -226,10 +221,7 @@ export function UndoPill({
                 r={RING_RADIUS}
                 fill="none"
                 strokeWidth={2}
-                className={cn(
-                  "transition-colors duration-200",
-                  isPaused ? "stroke-white/45" : "stroke-neutral-500/50",
-                )}
+                className={`transition-colors duration-200 ${isPaused ? "stroke-white/45" : "stroke-neutral-500/50"}`}
               />
               <motion.circle
                 cx={RING_CENTER}
@@ -277,11 +269,7 @@ export function UndoPill({
             type="button"
             onClick={handleUndo}
             aria-label={`${label}, undo`}
-            className={cn(
-              "-my-1 touch-manipulation rounded-full px-1.5 py-1 font-medium underline-offset-2 transition-colors",
-              "hover:bg-white/10 hover:underline active:bg-white/20",
-              "focus-visible:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white/70",
-            )}
+            className="-my-1 touch-manipulation rounded-full px-1.5 py-1 font-medium underline-offset-2 transition-colors hover:bg-white/10 hover:underline active:bg-white/20 focus-visible:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-white/70"
           >
             {undoLabel}
           </button>

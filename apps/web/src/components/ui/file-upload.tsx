@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES = [
   { ext: "pdf", label: "PDF" },
@@ -41,10 +40,7 @@ function FileTypeIcon({ ext }: { ext: string }) {
   const cls = colorMap[ext] ?? "bg-gray-100 text-gray-600";
   return (
     <span
-      className={cn(
-        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold uppercase",
-        cls,
-      )}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold uppercase ${cls}`}
     >
       {ext.slice(0, 3)}
     </span>
@@ -135,7 +131,7 @@ export function FileUpload({
       <div
         role="button"
         tabIndex={0}
-        aria-label="Upload documents — click or drag and drop"
+        aria-label="Upload documents, click or drag and drop"
         onDragEnter={(e) => {
           e.preventDefault();
           dragDepthRef.current += 1;
@@ -162,13 +158,7 @@ export function FileUpload({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
         }}
-        className={cn(
-          "relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-          isDragOver
-            ? "border-primary bg-primary/5 scale-[1.01]"
-            : "border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50/50",
-        )}
+        className={`relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isDragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50/50"}`}
       >
         <input
           ref={inputRef}
@@ -180,12 +170,7 @@ export function FileUpload({
         />
 
         <div
-          className={cn(
-            "pointer-events-none mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-200",
-            isDragOver
-              ? "bg-primary/10 text-primary scale-110"
-              : "bg-gray-100 text-gray-400",
-          )}
+          className={`pointer-events-none mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-200 ${isDragOver ? "bg-primary/10 text-primary scale-110" : "bg-gray-100 text-gray-400"}`}
         >
           <svg
             className="h-7 w-7"

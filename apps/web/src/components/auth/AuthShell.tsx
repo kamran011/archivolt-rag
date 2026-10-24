@@ -66,7 +66,7 @@ export default function AuthShell({ children }: { children: ReactNode }) {
           </h2>
           <p className="text-white/50 text-sm leading-relaxed mb-10">
             Connect your knowledge base and let your team get accurate,
-            evidence-backed answers — instantly.
+            evidence-backed answers, instantly.
           </p>
 
           <ul className="space-y-4">
