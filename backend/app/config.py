@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Email (Resend) — used for transactional emails sent directly from the backend
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "noreply@archivolt.dev"
+
     # Embedding
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSIONS: int = 1536

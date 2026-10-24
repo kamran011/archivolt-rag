@@ -213,15 +213,40 @@ class OrganizationService:
             f"?invite={invite.id}&org={org_id}"
         )
         supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-        try:
-            supabase.auth.admin.invite_user_by_email(
-                invite.email,
-                options={"redirect_to": redirect_to},
+
+        # Generate a fresh invite link (does not send email itself)
+        link_response = supabase.auth.admin.generate_link({
+            "type": "invite",
+            "email": invite.email,
+            "options": {"redirect_to": redirect_to},
+        })
+        action_link = link_response.properties.action_link
+
+        # Send the email directly via Resend HTTP API
+        if not settings.RESEND_API_KEY:
+            raise ValidationError("Email service is not configured (RESEND_API_KEY missing).")
+
+        import httpx
+        html = (
+            f"<p>You've been invited to join an organization on Ragix.</p>"
+            f"<p><a href='{action_link}' style='background:#6a35ff;color:#fff;padding:10px 20px;"
+            f"border-radius:8px;text-decoration:none;display:inline-block;'>Accept invitation</a></p>"
+            f"<p>This link expires in 24 hours. If you didn't expect this email, you can ignore it.</p>"
+        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                json={
+                    "from": settings.EMAIL_FROM,
+                    "to": invite.email,
+                    "subject": "You've been invited to join Ragix",
+                    "html": html,
+                },
+                timeout=10,
             )
-        except Exception as exc:
-            # Supabase raises if the user already has a recent pending invite;
-            # treat it as a success — the existing link is still valid.
-            logger.warning("invitation_resend_supabase_error", invite_id=str(invite.id), error=str(exc))
+            resp.raise_for_status()
+
         logger.info("invitation_resent", invite_id=str(invite.id), org_id=str(org_id), email=invite.email)
         return invite
 
