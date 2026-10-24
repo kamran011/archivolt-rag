@@ -187,28 +187,28 @@ export default function LandingPage() {
             </div>
 
             {/* c2 — claim verification */}
-            <div style={{ gridColumn: "span 2", gridRow: "span 1", background: "#0c0a1c", borderRadius: "20px", border: "1px solid rgba(52,211,153,0.18)", padding: "28px 32px", display: "flex", gap: "22px", alignItems: "center", overflow: "hidden", position: "relative" }}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "13px", background: "rgba(52,211,153,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ gridColumn: "span 2", gridRow: "span 1", background: "#0c0a1c", borderRadius: "20px", border: "1px solid rgba(52,211,153,0.18)", padding: "28px 32px", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden", position: "relative" }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "13px", background: "rgba(52,211,153,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <svg width="20" height="20" fill="none" stroke="#34d399" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
-                <h3 style={{ color: "#fff", fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", marginBottom: "6px" }}>Claim verification</h3>
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65 }}>Every answer is checked against source material. Conflicting evidence is surfaced automatically.</p>
+                <h3 style={{ color: "#fff", fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", marginBottom: "8px" }}>Claim verification</h3>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65, margin: 0 }}>Every answer is checked against source material. Conflicting evidence is surfaced automatically.</p>
               </div>
             </div>
 
             {/* c3 — observability */}
-            <div style={{ gridColumn: "span 2", gridRow: "span 1", background: "#0c0a1c", borderRadius: "20px", border: "1px solid rgba(245,158,11,0.18)", padding: "28px 32px", display: "flex", gap: "22px", alignItems: "center", overflow: "hidden" }}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "13px", background: "rgba(245,158,11,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ gridColumn: "span 2", gridRow: "span 1", background: "#0c0a1c", borderRadius: "20px", border: "1px solid rgba(245,158,11,0.18)", padding: "28px 32px", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "13px", background: "rgba(245,158,11,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <svg width="20" height="20" fill="none" stroke="#fbbf24" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
               <div>
-                <h3 style={{ color: "#fff", fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", marginBottom: "6px" }}>Full observability</h3>
-                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65 }}>Trace every retrieval step: what was fetched, how it ranked, and why the model answered or abstained.</p>
+                <h3 style={{ color: "#fff", fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", marginBottom: "8px" }}>Full observability</h3>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", lineHeight: 1.65, margin: 0 }}>Trace every retrieval step: what was fetched, how it ranked, and why the model answered or abstained.</p>
               </div>
             </div>
 

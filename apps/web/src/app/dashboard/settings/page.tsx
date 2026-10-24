@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
+import { useCurrentUser } from "@/providers/CurrentUserProvider";
 import type { OrgMember, OrgRole } from "@/lib/types";
 
 const OWNER_ASSIGNABLE: OrgRole[] = ["owner", "admin", "member", "viewer"];
@@ -12,6 +13,7 @@ const ADMIN_ASSIGNABLE: OrgRole[] = ["member", "viewer"];
 
 export default function SettingsPage() {
   const { currentOrg, refresh } = useOrganization();
+  const { user: currentUser } = useCurrentUser();
   const orgId = currentOrg?.id;
   const canManage = currentOrg?.role === "owner" || currentOrg?.role === "admin";
   const isOwner = currentOrg?.role === "owner";
@@ -117,64 +119,70 @@ export default function SettingsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(members ?? []).map((m) => (
-                <tr key={m.id}>
-                  <td className="py-2 font-mono text-xs text-gray-700">{m.user_id}</td>
-                  <td className="py-2">
-                    {canManage ? (
-                      <select
-                        value={m.role}
-                        disabled={busy || !assignableRoles.includes(m.role as OrgRole)}
-                        onChange={(e) =>
-                          run(async () => {
-                            await api.patch(
-                              `/api/v1/organizations/${org.id}/members/${m.id}`,
-                              { role: e.target.value },
-                              org.id,
-                            );
-                            await reloadMembers();
-                          })
-                        }
-                        className="rounded-md border border-gray-200 px-2 py-1 text-xs disabled:opacity-60"
-                      >
-                        {assignableRoles.includes(m.role as OrgRole)
-                          ? assignableRoles.map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))
-                          : [m.role].map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                      </select>
-                    ) : (
-                      m.role
-                    )}
-                  </td>
-                  <td className="py-2 text-right">
-                    {canManage && (
-                      <button
-                        disabled={busy}
-                        onClick={() => {
-                          if (!window.confirm("Remove this member from the organization?")) return;
-                          void run(async () => {
-                            await api.delete(
-                              `/api/v1/organizations/${org.id}/members/${m.id}`,
-                              org.id,
-                            );
-                            await reloadMembers();
-                          });
-                        }}
-                        className="cursor-pointer text-xs text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {(members ?? []).map((m) => {
+                const isSelf = m.user_id === currentUser?.id;
+                return (
+                  <tr key={m.id}>
+                    <td className="py-2 font-mono text-xs text-gray-700">
+                      {m.user_id}
+                      {isSelf && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                    </td>
+                    <td className="py-2">
+                      {canManage && !isSelf ? (
+                        <select
+                          value={m.role}
+                          disabled={busy || !assignableRoles.includes(m.role as OrgRole)}
+                          onChange={(e) =>
+                            run(async () => {
+                              await api.patch(
+                                `/api/v1/organizations/${org.id}/members/${m.id}`,
+                                { role: e.target.value },
+                                org.id,
+                              );
+                              await reloadMembers();
+                            })
+                          }
+                          className="rounded-md border border-gray-200 px-2 py-1 text-xs disabled:opacity-60"
+                        >
+                          {assignableRoles.includes(m.role as OrgRole)
+                            ? assignableRoles.map((r) => (
+                                <option key={r} value={r}>
+                                  {r}
+                                </option>
+                              ))
+                            : [m.role].map((r) => (
+                                <option key={r} value={r}>
+                                  {r}
+                                </option>
+                              ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-gray-700">{m.role}</span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right">
+                      {canManage && !isSelf && (
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            if (!window.confirm("Remove this member from the organization?")) return;
+                            void run(async () => {
+                              await api.delete(
+                                `/api/v1/organizations/${org.id}/members/${m.id}`,
+                                org.id,
+                              );
+                              await reloadMembers();
+                            });
+                          }}
+                          className="cursor-pointer text-xs text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
