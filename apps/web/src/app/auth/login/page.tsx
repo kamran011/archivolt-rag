@@ -34,19 +34,23 @@ export default function LoginPage() {
     <AuthShell>
       <main id="main-content" className="animate-fade-slide-up">
         <div className="mb-7">
-          <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-          <p className="mt-1 text-sm text-gray-500">Sign in to your workspace</p>
+          <h1 className="text-2xl font-bold text-white">Welcome back</h1>
+          <p className="mt-1 text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>Sign in to your workspace</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div role="alert" className="animate-shake rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div
+              role="alert"
+              className="animate-shake rounded-lg px-4 py-3 text-sm"
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5" }}
+            >
               {error}
             </div>
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label htmlFor="email" className="block text-sm font-medium mb-1.5" style={{ color: "rgba(255,255,255,0.6)" }}>
               Email
             </label>
             <input
@@ -55,13 +59,16 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+              className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(106,53,255,0.6)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium mb-1.5" style={{ color: "rgba(255,255,255,0.6)" }}>
               Password
             </label>
             <input
@@ -70,7 +77,10 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+              className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(106,53,255,0.6)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
               placeholder="••••••••"
             />
           </div>
@@ -78,14 +88,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full cursor-pointer rounded-lg bg-primary text-white py-2.5 text-sm font-medium hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full cursor-pointer rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            style={{ background: "#6a35ff", boxShadow: "0 8px 24px rgba(106,53,255,0.35)" }}
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
             Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline font-medium">
+            <Link href="/auth/signup" className="font-medium hover:underline" style={{ color: "#a78bfa" }}>
               Sign up
             </Link>
           </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 const LOGO = (
   <svg width="48" height="48" viewBox="0 0 32 32" fill="none" aria-hidden>
@@ -42,6 +42,12 @@ const FEATURES = [
 ];
 
 export default function AuthShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const prev = document.body.style.background;
+    document.body.style.background = "#06040f";
+    return () => { document.body.style.background = prev; };
+  }, []);
+
   return (
     <div className="flex min-h-screen">
       {/* Left panel — brand */}
@@ -86,7 +92,10 @@ export default function AuthShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Right panel — form */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-[#f4f5f8] px-6 py-12">
+      <div
+        className="flex flex-1 flex-col items-center justify-center px-6 py-12"
+        style={{ background: "#06040f" }}
+      >
         {/* Mobile-only logo */}
         <div className="mb-8 flex items-center gap-2.5 lg:hidden">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
@@ -98,10 +107,19 @@ export default function AuthShell({ children }: { children: ReactNode }) {
             <circle cx="12.5" cy="11.5" r="2.8" fill="none" stroke="#a78bfa" strokeWidth="1.5" />
             <line x1="14.5" y1="13.5" x2="17" y2="16" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          <span className="text-lg font-bold text-gray-900">Ragix</span>
+          <span className="text-lg font-bold text-white">Ragix</span>
         </div>
 
-        <div className="w-full max-w-sm">{children}</div>
+        {/* Glass card */}
+        <div
+          className="w-full max-w-sm rounded-2xl p-8"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
