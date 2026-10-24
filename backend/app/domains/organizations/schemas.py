@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 
 from app.models.organization_member import OrgRole
 
@@ -50,8 +50,24 @@ class OrgResponse(BaseModel):
 
 
 class OrgMemberCreate(BaseModel):
-    email: str
+    user_id: uuid.UUID
     role: OrgRole = OrgRole.member
+
+
+class OrgInvitationCreate(BaseModel):
+    email: EmailStr
+    role: OrgRole = OrgRole.member
+
+
+class OrgInvitationResponse(BaseModel):
+    id: uuid.UUID
+    org_id: uuid.UUID
+    email: str
+    role: OrgRole
+    created_at: datetime
+    accepted_at: datetime | None
+
+    model_config = {"from_attributes": True}
 
 
 class OrgMemberUpdate(BaseModel):

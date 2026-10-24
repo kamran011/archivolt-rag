@@ -8,6 +8,13 @@ import { useOrganization } from "@/providers/OrganizationProvider";
 import { useCurrentUser } from "@/providers/CurrentUserProvider";
 import type { OrgMember, OrgRole } from "@/lib/types";
 
+interface OrgInvitation {
+  id: string;
+  email: string;
+  role: OrgRole;
+  created_at: string;
+}
+
 const OWNER_ASSIGNABLE: OrgRole[] = ["owner", "admin", "member", "viewer"];
 const ADMIN_ASSIGNABLE: OrgRole[] = ["member", "viewer"];
 
@@ -28,6 +35,15 @@ export default function SettingsPage() {
     orgId ? `/api/v1/organizations/${orgId}/members` : null,
     orgId,
     "Failed to load members",
+  );
+
+  const {
+    data: invitations,
+    refresh: reloadInvitations,
+  } = useApiResource<OrgInvitation[]>(
+    canManage && orgId ? `/api/v1/organizations/${orgId}/invitations` : null,
+    orgId,
+    "Failed to load invitations",
   );
 
   const [busy, setBusy] = useState(false);
@@ -194,17 +210,17 @@ export default function SettingsPage() {
               e.preventDefault();
               void run(async () => {
                 await api.post(
-                  `/api/v1/organizations/${org.id}/members`,
+                  `/api/v1/organizations/${org.id}/invitations`,
                   { email: newEmail.trim(), role: newRole },
                   org.id,
                 );
                 setNewEmail("");
-                await reloadMembers();
+                await reloadInvitations();
               });
             }}
           >
             <label className="flex-1 min-w-64 text-xs text-gray-500">
-              Email address
+              Invite by email
               <input
                 type="email"
                 value={newEmail}
@@ -232,12 +248,26 @@ export default function SettingsPage() {
               disabled={busy || !newEmail.trim()}
               className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Add member
+              Send invite
             </button>
           </form>
         )}
         {canManage && !isOwner && (
-          <p className="text-xs text-gray-500 mt-2">Admins can assign member and viewer roles only.</p>
+          <p className="text-xs text-gray-500 mt-2">Admins can invite members and viewers only.</p>
+        )}
+
+        {canManage && invitations && invitations.length > 0 && (
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Pending invitations</h3>
+            <ul className="space-y-1">
+              {invitations.map((inv) => (
+                <li key={inv.id} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700">{inv.email}</span>
+                  <span className="text-xs text-gray-400 capitalize">{inv.role} · awaiting acceptance</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
     </div>

@@ -8,6 +8,8 @@ from app.domains.auth.dependencies import get_current_user, require_role_in_path
 from app.domains.auth.schemas import CurrentUser
 from app.domains.organizations.schemas import (
     OrgCreate,
+    OrgInvitationCreate,
+    OrgInvitationResponse,
     OrgMemberCreate,
     OrgMemberResponse,
     OrgMemberUpdate,
@@ -119,3 +121,45 @@ async def remove_member(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await org_service.remove_member(db, org_id, member_id, current_user.id)
+
+
+# ── Invitations ────────────────────────────────────────────────────────────────
+
+
+@router.post("/{org_id}/invitations", response_model=OrgInvitationResponse, status_code=201)
+async def create_invitation(
+    org_id: uuid.UUID,
+    data: OrgInvitationCreate,
+    current_user: CurrentUser = Depends(
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    if current_user.role == OrgRole.admin and data.role not in (OrgRole.member, OrgRole.viewer):
+        raise HTTPException(status_code=403, detail="Admins can only invite members or viewers.")
+    invite = await org_service.create_invitation(db, org_id, current_user.id, data)
+    return OrgInvitationResponse.model_validate(invite)
+
+
+@router.get("/{org_id}/invitations", response_model=list[OrgInvitationResponse])
+async def list_invitations(
+    org_id: uuid.UUID,
+    current_user: CurrentUser = Depends(
+        require_role_in_path_org(OrgRole.admin, OrgRole.owner)
+    ),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    invites = await org_service.list_invitations(db, org_id)
+    return [OrgInvitationResponse.model_validate(i) for i in invites]
+
+
+@router.post("/invitations/{invite_id}/accept", response_model=OrgMemberResponse, status_code=201)
+async def accept_invitation(
+    invite_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    member = await org_service.accept_invitation(
+        db, invite_id, current_user.id, current_user.email
+    )
+    return OrgMemberResponse.model_validate(member)

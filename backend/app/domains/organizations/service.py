@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import structlog
 from supabase import create_client
@@ -7,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
-from app.domains.organizations.schemas import OrgCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
+from app.domains.organizations.schemas import OrgCreate, OrgInvitationCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
+from app.models.org_invitation import OrgInvitation
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
 
@@ -128,30 +130,116 @@ class OrganizationService:
         org_id: uuid.UUID,
         data: OrgMemberCreate,
     ) -> OrganizationMember:
-        # Resolve email → user_id via Supabase Admin API
-        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-        response = supabase.auth.admin.list_users()
-        user_id: uuid.UUID | None = None
-        for u in response:
-            if u.email and u.email.lower() == data.email.lower():
-                user_id = uuid.UUID(u.id)
-                break
-        if user_id is None:
-            raise ValidationError(f"No account found for email '{data.email}'. The user must sign up first.")
-
-        # Check not already a member
-        existing = await self._get_member(db, org_id, user_id)
+        existing = await self._get_member(db, org_id, data.user_id)
         if existing:
             raise ValidationError("User is already a member of this organization")
 
         member = OrganizationMember(
             organization_id=org_id,
-            user_id=user_id,
+            user_id=data.user_id,
             role=data.role,
         )
         db.add(member)
         await db.flush()
         return member
+
+    async def create_invitation(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        invited_by: uuid.UUID,
+        data: OrgInvitationCreate,
+    ) -> OrgInvitation:
+        # Verify not already a member (look up by email via Supabase admin)
+        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        users = supabase.auth.admin.list_users()
+        existing_user_id: uuid.UUID | None = None
+        for u in users:
+            if u.email and u.email.lower() == data.email.lower():
+                existing_user_id = uuid.UUID(u.id)
+                break
+
+        if existing_user_id:
+            member = await self._get_member(db, org_id, existing_user_id)
+            if member:
+                raise ValidationError("This user is already a member of the organization.")
+
+        # Check no pending invite already exists for this email+org
+        stmt = select(OrgInvitation).where(
+            OrgInvitation.org_id == org_id,
+            OrgInvitation.accepted_at.is_(None),
+        )
+        result = await db.execute(stmt)
+        for inv in result.scalars().all():
+            if inv.email.lower() == data.email.lower():
+                raise ValidationError("An invitation has already been sent to this email address.")
+
+        invite = OrgInvitation(
+            org_id=org_id,
+            email=data.email,
+            role=data.role,
+            invited_by=invited_by,
+        )
+        db.add(invite)
+        await db.flush()
+
+        # Send the invite email via Supabase Admin API
+        redirect_to = (
+            f"{settings.FRONTEND_URL}/invite/accept"
+            f"?invite={invite.id}&org={org_id}"
+        )
+        supabase.auth.admin.invite_user_by_email(
+            data.email,
+            options={"redirect_to": redirect_to},
+        )
+
+        logger.info("invitation_sent", invite_id=str(invite.id), org_id=str(org_id), email=data.email)
+        return invite
+
+    async def accept_invitation(
+        self,
+        db: AsyncSession,
+        invite_id: uuid.UUID,
+        user_id: uuid.UUID,
+        user_email: str,
+    ) -> OrganizationMember:
+        invite = await db.get(OrgInvitation, invite_id)
+        if not invite:
+            raise NotFoundError("Invitation not found or already used.")
+        if invite.accepted_at is not None:
+            raise ValidationError("This invitation has already been accepted.")
+        if invite.email.lower() != user_email.lower():
+            raise ForbiddenError("This invitation was sent to a different email address.")
+
+        # Check not already a member
+        existing = await self._get_member(db, invite.org_id, user_id)
+        if existing:
+            raise ValidationError("You are already a member of this organization.")
+
+        member = OrganizationMember(
+            organization_id=invite.org_id,
+            user_id=user_id,
+            role=invite.role,
+        )
+        db.add(member)
+
+        invite.accepted_at = datetime.now(timezone.utc)
+        await db.flush()
+
+        logger.info("invitation_accepted", invite_id=str(invite_id), user_id=str(user_id))
+        return member
+
+    async def list_invitations(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+    ) -> list[OrgInvitation]:
+        stmt = select(OrgInvitation).where(
+            OrgInvitation.org_id == org_id,
+            OrgInvitation.accepted_at.is_(None),
+        ).order_by(OrgInvitation.created_at.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     async def remove_member(
         self,

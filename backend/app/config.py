@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # App
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Embedding
     EMBEDDING_MODEL: str = "text-embedding-3-small"
