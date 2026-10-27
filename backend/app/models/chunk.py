@@ -2,7 +2,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, Index, Integer, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,7 @@ class Chunk(UUIDPrimaryKeyMixin, Base):
     __table_args__ = (
         Index("ix_chunks_kb_org", "knowledge_base_id", "organization_id"),
         Index("ix_chunks_doc", "document_id"),
+        Index("ix_chunks_kb_hash", "knowledge_base_id", "content_hash"),
     )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True)
@@ -27,6 +28,8 @@ class Chunk(UUIDPrimaryKeyMixin, Base):
     knowledge_base_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    # sha256 of whitespace-normalized content: embedding reuse + near-duplicate detection
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     metadata_: Mapped[dict] = mapped_column(
         "metadata", portable_jsonb(), default=dict, nullable=False

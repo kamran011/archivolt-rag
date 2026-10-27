@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     # Also pull in the rest of a hit's section (parent context). Off by default: it can add
     # a lot of text; the context budget still bounds what reaches the LLM.
     ENABLE_PARENT_EXPANSION: bool = False
+    # Flag (never block) a new upload sharing at least this fraction of chunks with another
+    # current document in the same KB. 0 disables the check.
+    NEAR_DUPLICATE_THRESHOLD: float = 0.9
     ENABLE_SECTION_SUMMARIES: bool = False  # costs one LLM call per section at ingest
 
     # Agentic retrieval (opt-in per request; hard bounds on every run)

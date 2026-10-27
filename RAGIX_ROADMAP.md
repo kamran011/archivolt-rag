@@ -130,10 +130,15 @@ interfaces stay abstract — no Redis dependency.
 - Query rewriting
 - Multi-query
 - Sub-query decomposition
-- Incremental, content-hash-based re-embedding (detect which chunks
-  actually changed instead of re-embedding the whole document)
-- Corpus-level near-duplicate document detection at ingestion — confirmed
-  gap (audited 2026-10-08): `evidence.py`'s Jaccard dedup only runs at
+- ~~Incremental, content-hash-based re-embedding~~ — **built**
+  (`ingestion/dedup.py`: `chunks.content_hash`; a new version reuses the
+  superseded version's vectors for unchanged chunks and records
+  `chunks_embedded` / `chunks_reused` / `index_lag_seconds`). Stable
+  chunk-ID upsert and webhook/CDC triggers are still open
+- ~~Corpus-level near-duplicate document detection at ingestion~~ —
+  **built** (flag-only: `parsing_metadata.near_duplicates`, threshold
+  `NEAR_DUPLICATE_THRESHOLD`, exact chunk-hash overlap; no fuzzy matching).
+  Original gap (audited 2026-10-08): `evidence.py`'s Jaccard dedup only runs at
   query time on already-retrieved chunks. Nothing detects "this new
   upload is 90% the same content as an existing document" at ingestion
   time, so the same paragraph can sit indexed under several documents and
