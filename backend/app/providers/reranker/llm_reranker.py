@@ -1,4 +1,5 @@
 import json
+from contextvars import ContextVar
 
 import structlog
 
@@ -11,6 +12,15 @@ from app.providers.reranker.base import RerankerProvider
 logger = structlog.get_logger()
 
 BATCH_SIZE = 10
+
+# Set when any batch of the current rerank fell back (provider error or unparseable output).
+# Per-task, so concurrent requests don't see each other's state. Cache layers read it and
+# never store a degraded result.
+rerank_degraded: ContextVar[bool] = ContextVar("rerank_degraded", default=False)
+
+
+class RerankParseError(ValueError):
+    pass
 
 RERANK_PROMPT = """You are a relevance judge. Given a search query and a list of candidate passages, \
 score each passage's relevance to the query on a scale of 0-10 (10 = directly answers the query, \
@@ -52,11 +62,18 @@ class LLMReranker(RerankerProvider):
 
         for i in range(0, len(chunks), BATCH_SIZE):
             batch = chunks[i : i + BATCH_SIZE]
-            try:
-                scores = await self._score_batch(query, batch)
-            except Exception as e:
-                logger.warning("reranker_batch_failed_using_original_order", error=str(e))
-                # Fall back to original retrieval scores for this batch
+            scores = None
+            for attempt in (1, 2):  # one retry: most failures are transient (rate limit, bad JSON)
+                try:
+                    scores = await self._score_batch(query, batch)
+                    break
+                except Exception as e:
+                    logger.warning("reranker_batch_failed", attempt=attempt, error=str(e))
+            if scores is None:
+                # Keep the original retrieval scores for this batch. An unparseable reply is a
+                # failure, not a verdict: it must never turn into "every passage scored 0".
+                rerank_degraded.set(True)
+                logger.warning("reranker_batch_failed_using_original_order")
                 scores = [c.score for c in batch]
 
             for chunk, score in zip(batch, scores, strict=True):
@@ -102,4 +119,4 @@ class LLMReranker(RerankerProvider):
             return [scores_by_index.get(i, 0.0) for i in range(expected_count)]
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             logger.warning("reranker_parse_failed", error=str(e), raw=raw[:200])
-            return [0.0] * expected_count
+            raise RerankParseError(str(e)) from e

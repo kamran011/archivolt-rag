@@ -95,8 +95,10 @@ async def test_reranker_handles_malformed_json_gracefully():
     chunks = [make_chunk("text")]
     result = await reranker.rerank("query", chunks, top_k=1)
 
+    # An unparseable reply is a failure, not a verdict: the passage keeps its retrieval
+    # score instead of being scored 0 (which would make the gate report "no evidence").
     assert len(result) == 1
-    assert result[0].score == 0.0
+    assert result[0].score == chunks[0].score
 
 
 @pytest.mark.asyncio

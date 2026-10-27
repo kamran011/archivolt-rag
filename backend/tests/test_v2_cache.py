@@ -127,3 +127,65 @@ async def test_verify_on_hit_rejects_new_version_or_missing_doc():
     assert not await response_cache._verify(db, org, AccessScope(None, True), {str(doc): 1})
     result.all.return_value = []  # superseded / deleted / no longer visible
     assert not await response_cache._verify(db, org, AccessScope(None, True), {str(doc): 1})
+
+
+@pytest.mark.asyncio
+async def test_degraded_rerank_is_served_but_not_cached():
+    from app.providers.reranker.llm_reranker import LLMReranker
+
+    class BadThenGoodLLM:
+        def __init__(self):
+            self.calls = 0
+
+        async def generate(self, messages, temperature=0.1, max_tokens=2048):
+            from app.providers.llm.base import LLMResponse
+
+            self.calls += 1
+            body = "sorry, I can't" if self.calls <= 2 else '[{"index": 0, "relevance_score": 9}]'
+            return LLMResponse(content=body, prompt_tokens=1, completion_tokens=1,
+                               model="f", finish_reason="stop")
+
+    a = _chunk(0.55)
+    llm = BadThenGoodLLM()
+    cached = CachedReranker(LLMReranker(llm=llm), MemoryCache(), ttl=60)
+
+    first = await cached.rerank("q", [a], 1)  # both attempts unparseable -> fallback
+    assert first[0].score == 0.55  # original score kept, not 0.0
+    second = await cached.rerank("q", [a], 1)  # not served from cache: asks again
+    assert second[0].score == 0.9
+    third = await cached.rerank("q", [a], 1)  # good result is cached
+    assert third[0].score == 0.9 and llm.calls == 3
+
+
+@pytest.mark.asyncio
+async def test_rerank_retries_once_then_succeeds():
+    from app.providers.reranker.llm_reranker import LLMReranker
+
+    class FlakyLLM:
+        calls = 0
+
+        async def generate(self, messages, temperature=0.1, max_tokens=2048):
+            from app.providers.llm.base import LLMResponse
+
+            FlakyLLM.calls += 1
+            if FlakyLLM.calls == 1:
+                raise RuntimeError("429 rate limited")
+            return LLMResponse(content='[{"index": 0, "relevance_score": 8}]', prompt_tokens=1,
+                               completion_tokens=1, model="f", finish_reason="stop")
+
+    out = await LLMReranker(llm=FlakyLLM()).rerank("q", [_chunk(0.1)], 1)
+    assert out[0].score == 0.8
+
+
+@pytest.mark.asyncio
+async def test_legacy_empty_rerank_entry_is_ignored():
+    a = _chunk(0.4)
+    cache = MemoryCache()
+    inner = MagicMock()
+    inner.rerank = AsyncMock(return_value=[a.model_copy(update={"score": 0.8})])
+    r = CachedReranker(inner, cache, ttl=60)
+    await r.rerank("q", [a], 1)
+    for key in list(cache._data):
+        await cache.set(key, "[]")  # what an old poisoned entry looks like
+    out = await r.rerank("q", [a], 1)
+    assert out and out[0].score == 0.8

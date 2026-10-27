@@ -62,12 +62,22 @@ class CachedReranker(RerankerProvider):
             *sorted(str(c.chunk_id) for c in chunks),
         )
         hit = await safe(self._cache.get_json(key))
-        if hit is not None:
+        if hit:  # an empty entry is never a valid rerank of a non-empty candidate list
             by_id = {str(c.chunk_id): c for c in chunks}
             if all(cid in by_id for cid, _ in hit):
                 return [by_id[cid].model_copy(update={"score": score}) for cid, score in hit]
-        result: list[RetrievedChunk] = await self._inner.rerank(query, chunks, top_k)
-        await safe(
-            self._cache.set_json(key, [[str(c.chunk_id), c.score] for c in result], self._ttl)
-        )
+        from app.providers.reranker.llm_reranker import rerank_degraded
+
+        token = rerank_degraded.set(False)
+        try:
+            result: list[RetrievedChunk] = await self._inner.rerank(query, chunks, top_k)
+            degraded = rerank_degraded.get()
+        finally:
+            rerank_degraded.reset(token)
+        # A fallback result (provider failed) is served once but never cached, so one bad
+        # call cannot keep failing the same question for the whole TTL.
+        if result and not degraded:
+            await safe(
+                self._cache.set_json(key, [[str(c.chunk_id), c.score] for c in result], self._ttl)
+            )
         return result
