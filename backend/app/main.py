@@ -25,6 +25,8 @@ async def lifespan(app: FastAPI):
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("database_connected")
+    except Exception as e:
+        logger.error("database_connection_failed", error=str(e))
     # Which optional features this process actually runs with (no secrets): makes a
     # missing or misspelled environment variable visible at a glance.
     logger.info(
@@ -39,8 +41,6 @@ async def lifespan(app: FastAPI):
         cost_routing=settings.ENABLE_COST_AWARE_ROUTING,
         cheap_model=settings.CHEAP_LLM_MODEL or None,
     )
-    except Exception as e:
-        logger.error("database_connection_failed", error=str(e))
     try:
         from app.domains.ingestion.background import recover_stuck_ingestions
 
