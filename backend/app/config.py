@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     # Abstain (instead of answering and exposing the conflict) when sources disagree
     # and the resolver cannot pick a winner.
     ABSTAIN_ON_UNRESOLVED_CONFLICT: bool = False
+    # Query rewriting + multi-query + sub-query decomposition: one cheap LLM call per RAG
+    # request (RERANKER_MODEL). Extra queries are searched and fused with RRF.
+    ENABLE_QUERY_TRANSFORM: bool = False
+    QUERY_TRANSFORM_MAX_EXTRA: int = 3
     ENABLE_NEIGHBOR_EXPANSION: bool = True
     # Also pull in the rest of a hit's section (parent context). Off by default: it can add
     # a lot of text; the context budget still bounds what reaches the LLM.

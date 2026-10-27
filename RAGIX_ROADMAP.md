@@ -127,9 +127,10 @@ interfaces stay abstract — no Redis dependency.
 
 ## V2 — Adaptive RAG + Decision Layer
 
-- Query rewriting
-- Multi-query
-- Sub-query decomposition
+- ~~Query rewriting~~ / ~~Multi-query~~ / ~~Sub-query decomposition~~ —
+  **built** (`retrieval/query_transform.py`, one bounded LLM call, opt-in via
+  `ENABLE_QUERY_TRANSFORM`; extra queries fused with RRF in `rag/service.py`;
+  falls back to the original query on any failure)
 - ~~Incremental, content-hash-based re-embedding~~ — **built**
   (`ingestion/dedup.py`: `chunks.content_hash`; a new version reuses the
   superseded version's vectors for unchanged chunks and records
