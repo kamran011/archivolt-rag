@@ -21,6 +21,7 @@ from app.domains.retrieval.schemas import RetrievalFilters, RetrievedChunk
 from app.domains.retrieval.tree import iter_nodes, subtree_chunk_indices
 from app.models.document import Document
 from app.models.summary import DocumentSummary
+from app.providers.embeddings.query_memo import embed_query
 from app.providers.embeddings.registry import get_embedding_provider
 
 DOCUMENT_CANDIDATES = 5
@@ -39,7 +40,7 @@ class SummaryRetrievalEngine(RetrievalEngine):
         embedding_model: str = "text-embedding-3-small",
         scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
-        query_embedding = await get_embedding_provider(embedding_model).embed_query(query)
+        query_embedding = await embed_query(get_embedding_provider(embedding_model), query)
 
         # 1. candidate documents, by document-level summary
         doc_hits = await self._top(

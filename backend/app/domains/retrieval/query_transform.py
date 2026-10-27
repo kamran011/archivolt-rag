@@ -24,6 +24,47 @@ logger = structlog.get_logger()
 
 MAX_QUERY_CHARS = 300
 MAX_HISTORY_TURNS = 4
+MIN_CLEAR_WORDS = 4
+
+# Words that make a question lean on earlier turns ("what about it?", "and the other one?").
+_REFERENCE_WORDS = frozenset(
+    """it its it's this that these those they them their theirs he she him her his hers
+    above previous earlier same former latter also again else more one ones""".split()
+)
+_FOLLOW_UP_OPENERS = ("and ", "but ", "so ", "then ", "what about", "how about", "or ")
+_MIN_STANDALONE_WORDS = 4
+
+
+def is_standalone(query: str) -> bool:
+    """Conservative check that a question means the same thing without the conversation.
+    False positives would replay an answer to a different question, so anything that might
+    refer back to earlier turns counts as a follow-up and is not cached."""
+    text = " ".join(query.lower().split())
+    words = re.findall(r"[a-z']+", text)
+    if len(words) < _MIN_STANDALONE_WORDS or text.startswith(_FOLLOW_UP_OPENERS):
+        return False
+    return not any(w in _REFERENCE_WORDS for w in words)
+
+
+_MULTI_PART = re.compile(
+    r"\?.*\?|;|\b(and|also|then)\s+(what|how|why|when|where|which|who|is|are|does|do|can)\b",
+    re.I,
+)
+
+
+def needs_upfront_transform(query: str, intent: str, has_history: bool) -> bool:
+    """Whether the rewrite must run *before* the first search.
+
+    Up front when searching the raw question would be wrong or weak: a follow-up that
+    refers to earlier turns, a comparison or multi-part question (needs decomposition),
+    or a very short/vague question. A clear, single, self-contained question is searched
+    as-is first; the rewrite still runs later if that first search is insufficient."""
+    if has_history and not is_standalone(query):
+        return True
+    if intent == "comparison" or _MULTI_PART.search(query):
+        return True
+    return len(re.findall(r"[a-z0-9']+", query.lower())) < MIN_CLEAR_WORDS
+
 
 QUERY_PLAN_PROMPT = """You prepare search queries for a document retrieval system.
 Given a user question (and optional conversation), return ONLY a JSON object:

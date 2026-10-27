@@ -11,6 +11,9 @@ from app.domains.retrieval.engines.tree_engine import TreeRetrievalEngine
 from app.domains.retrieval.engines.vector_engine import VectorRetrievalEngine
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievalResult
 
+# The embedding model retrieval uses when the caller does not pass one.
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+
 _ENGINES = {
     "semantic": VectorRetrievalEngine(),
     "keyword": KeywordRetrievalEngine(),
@@ -26,7 +29,7 @@ class RetrievalService:
         db: AsyncSession,
         org_id: uuid.UUID,
         request: RetrievalRequest,
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         scope: AccessScope | None = None,
     ) -> RetrievalResult:
         strategy = request.strategy

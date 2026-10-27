@@ -10,6 +10,7 @@ from app.domains.retrieval.mapping import row_to_retrieved_chunk
 from app.domains.retrieval.schemas import RetrievalFilters, RetrievedChunk
 from app.models.chunk import Chunk
 from app.models.document import Document
+from app.providers.embeddings.query_memo import embed_query
 from app.providers.embeddings.registry import get_embedding_provider
 
 
@@ -26,7 +27,7 @@ class VectorRetrievalEngine(RetrievalEngine):
         scope: AccessScope | None = None,
     ) -> list[RetrievedChunk]:
         provider = get_embedding_provider(embedding_model)
-        query_embedding = await provider.embed_query(query)
+        query_embedding = await embed_query(provider, query)
 
         distance = Chunk.embedding.cosine_distance(query_embedding)
         stmt = (

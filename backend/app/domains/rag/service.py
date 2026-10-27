@@ -36,10 +36,10 @@ from app.domains.retrieval.evidence import ContextAssembler, EvidenceFilter, is_
 from app.domains.retrieval.evidence_gate import EvidenceGate, EvidenceGateResult
 from app.domains.retrieval.expansion import expand_with_neighbors, expand_with_parents
 from app.domains.retrieval.query_router import RouteDecision, query_router
-from app.domains.retrieval.query_transform import plan_queries
+from app.domains.retrieval.query_transform import needs_upfront_transform, plan_queries
 from app.domains.retrieval.rrf import reciprocal_rank_fusion
 from app.domains.retrieval.schemas import RetrievalRequest, RetrievedChunk
-from app.domains.retrieval.service import retrieval_service
+from app.domains.retrieval.service import DEFAULT_EMBEDDING_MODEL, retrieval_service
 from app.domains.retrieval.sufficiency import (
     SufficiencyResult,
     _covers,
@@ -48,6 +48,9 @@ from app.domains.retrieval.sufficiency import (
 from app.domains.tools.base import ToolContext, ToolExecutor
 from app.domains.tools.registry import default_registry
 from app.providers.cost import estimate_llm_cost, meter_total_usd, start_meter
+from app.providers.embeddings.query_memo import prefetch as prefetch_query_embeddings
+from app.providers.embeddings.query_memo import query_embedding_memo
+from app.providers.embeddings.registry import get_embedding_provider
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.model_router import choose_model
 from app.providers.llm.registry import get_llm_provider
@@ -278,6 +281,46 @@ async def _gather_rag_evidence(
     scope: AccessScope | None,
     actor: Actor | None = None,
 ) -> _Evidence:
+    # One query-embedding memo per request: every query variant is embedded once, in one
+    # batched call, and reused by each search strategy that needs it.
+    with query_embedding_memo():
+        return await _gather_rag_evidence_inner(db, org_id, request, route, trace, scope, actor)
+
+
+_EMBEDDING_ROUTES = frozenset({"semantic", "hybrid", "summary"})  # tree navigates with an LLM
+
+
+async def _prefetch_query_embeddings(route: RouteDecision, queries: list[str]) -> None:
+    if route.strategy in _EMBEDDING_ROUTES and queries:
+        await prefetch_query_embeddings(get_embedding_provider(DEFAULT_EMBEDDING_MODEL), queries)
+
+
+async def _run_query_transform(request: RAGRequest, trace: RetrievalTrace, *, deferred: bool):
+    with trace.span("query_transform", deferred=deferred) as span:
+        plan = await plan_queries(
+            request.query,
+            get_llm_provider(settings.RERANKER_MODEL),
+            request.conversation_history,
+            settings.QUERY_TRANSFORM_MAX_EXTRA,
+        )
+        span.attributes.update(
+            rewrite=plan.rewrite,
+            extra_queries=plan.extra_queries,
+            prompt_tokens=plan.prompt_tokens,
+            completion_tokens=plan.completion_tokens,
+        )
+    return plan
+
+
+async def _gather_rag_evidence_inner(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    request: RAGRequest,
+    route: RouteDecision,
+    trace: RetrievalTrace,
+    scope: AccessScope | None,
+    actor: Actor | None = None,
+) -> _Evidence:
     """Retrieve, rerank, filter and check the evidence; when the sufficiency gate says it
     is not enough, widen retrieval with another strategy (bounded) before giving up.
     Every candidate still comes from org-scoped queries, so expansion cannot widen access."""
@@ -292,23 +335,25 @@ async def _gather_rag_evidence(
 
     search_query = request.query
     extra_queries: list[str] = []
-    if settings.ENABLE_QUERY_TRANSFORM and not request.agentic and analysis.intent != "chitchat":
-        with trace.span("query_transform") as span:
-            plan = await plan_queries(
-                request.query,
-                get_llm_provider(settings.RERANKER_MODEL),
-                request.conversation_history,
-                settings.QUERY_TRANSFORM_MAX_EXTRA,
-            )
-            search_query = plan.primary
-            extra_queries = plan.extra_queries
-            span.attributes.update(
-                rewrite=plan.rewrite,
-                extra_queries=extra_queries,
-                prompt_tokens=plan.prompt_tokens,
-                completion_tokens=plan.completion_tokens,
-            )
+    transform = (
+        settings.ENABLE_QUERY_TRANSFORM and not request.agentic and analysis.intent != "chitchat"
+    )
+    # Clear, self-contained questions are searched as-is first; the rewrite is kept as a
+    # fallback for when that first search is insufficient.
+    transform_deferred = (
+        transform
+        and settings.QUERY_TRANSFORM_ADAPTIVE
+        and not needs_upfront_transform(
+            request.query, analysis.intent, bool(request.conversation_history)
+        )
+    )
+    if transform and not transform_deferred:
+        plan = await _run_query_transform(request, trace, deferred=False)
+        search_query = plan.primary
+        extra_queries = plan.extra_queries
 
+    if not request.agentic:
+        await _prefetch_query_embeddings(route, [search_query, *extra_queries])
     with trace.span("retrieval", route=route.strategy, route_reason=route.reason):
         retrieval = await _retrieve_candidates(
             db, org_id, request, route, scope, actor, query=search_query
@@ -351,6 +396,26 @@ async def _gather_rag_evidence(
 
         if gate.pass_gate and sufficiency.sufficient:
             break
+        if transform_deferred:
+            # The question as asked was not enough: now try its rewrite and alternative
+            # phrasings (same strategy), before switching to other strategies.
+            transform_deferred = False
+            plan = await _run_query_transform(request, trace, deferred=True)
+            asked = " ".join(request.query.lower().split())
+            variants = [
+                q for q in dict.fromkeys([plan.primary, *plan.extra_queries])
+                if " ".join(q.lower().split()) != asked
+            ]
+            if variants:
+                await _prefetch_query_embeddings(route, variants)
+                with trace.span("retrieval_expansion", strategy="query_rewrite", attempt=attempt):
+                    for variant in variants:
+                        extra = await _retrieve_candidates(
+                            db, org_id, request, route, scope, actor, query=variant
+                        )
+                        candidates = _merge_candidates(candidates, extra.chunks)
+                tried.append("query_rewrite")
+                continue
         if attempt < len(ladder):
             step = ladder[attempt]
             attempt += 1

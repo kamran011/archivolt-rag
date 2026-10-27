@@ -15,7 +15,6 @@ TTL is only a backstop and is shortened when a cited document has been re-versio
 from __future__ import annotations
 
 import hashlib
-import re
 import uuid
 
 import structlog
@@ -26,29 +25,10 @@ from app.config import settings
 from app.core.cache import get_cache, safe
 from app.domains.rag.schemas import RAGRequest, RAGResponse
 from app.domains.retrieval.access import AccessScope, visible_document_clause
+from app.domains.retrieval.query_transform import is_standalone
 from app.models.document import Document
 
 logger = structlog.get_logger()
-
-
-# Words that make a question lean on earlier turns ("what about it?", "and the other one?").
-_REFERENCE_WORDS = frozenset(
-    """it its it's this that these those they them their theirs he she him her his hers
-    above previous earlier same former latter also again else more one ones""".split()
-)
-_FOLLOW_UP_OPENERS = ("and ", "but ", "so ", "then ", "what about", "how about", "or ")
-_MIN_STANDALONE_WORDS = 4
-
-
-def is_standalone(query: str) -> bool:
-    """Conservative check that a question means the same thing without the conversation.
-    False positives would replay an answer to a different question, so anything that might
-    refer back to earlier turns counts as a follow-up and is not cached."""
-    text = " ".join(query.lower().split())
-    words = re.findall(r"[a-z']+", text)
-    if len(words) < _MIN_STANDALONE_WORDS or text.startswith(_FOLLOW_UP_OPENERS):
-        return False
-    return not any(w in _REFERENCE_WORDS for w in words)
 
 
 def is_cacheable_request(request: RAGRequest) -> bool:

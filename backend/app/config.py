@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     # request (RERANKER_MODEL). Extra queries are searched and fused with RRF.
     ENABLE_QUERY_TRANSFORM: bool = False
     QUERY_TRANSFORM_MAX_EXTRA: int = 3
+    # Adaptive: a clear, single, self-contained question is searched as-is first and only
+    # rewritten if that first search is insufficient (saves one LLM call on most questions).
+    # Follow-ups, comparisons, multi-part and very short questions are rewritten up front.
+    # False = always rewrite before searching (previous behavior).
+    QUERY_TRANSFORM_ADAPTIVE: bool = True
     ENABLE_NEIGHBOR_EXPANSION: bool = True
     # Also pull in the rest of a hit's section (parent context). Off by default: it can add
     # a lot of text; the context budget still bounds what reaches the LLM.
