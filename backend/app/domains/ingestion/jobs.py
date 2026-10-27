@@ -77,6 +77,8 @@ async def _ingest(job: Job, doc_id: uuid.UUID) -> None:
                 from app.domains.rag import response_cache
 
                 await response_cache.invalidate_kb(document.knowledge_base_id)
+                if document.supersedes_document_id:
+                    await response_cache.invalidate_document(document.supersedes_document_id)
         except (IngestionError, ValidationError, NotFoundError) as e:
             await db.rollback()
             # Bad file / missing record: retrying cannot help.

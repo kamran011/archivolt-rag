@@ -112,10 +112,12 @@ class DocumentService:
         *,
         scope: AccessScope,
     ) -> Document:
-        """Uploads a new version of an existing document. The prior version is
-        marked superseded and excluded from retrieval by default (freshness),
-        but remains queryable for historical questions via
-        RetrievalFilters.include_superseded."""
+        """Uploads a new version of an existing document. The prior version stays
+        current until the new one is ingested successfully (see
+        IngestionService._supersede_previous); only then is it excluded from
+        retrieval by default. It remains queryable for historical questions via
+        RetrievalFilters.include_superseded. If ingestion fails, the prior version
+        simply stays current, so the content never drops out of retrieval."""
         previous = await self.get(db, org_id, doc_id, scope=scope)
 
         new_document = await self._store_and_create(
@@ -140,12 +142,9 @@ class DocumentService:
                 DocumentAccess(organization_id=org_id, document_id=new_document.id, user_id=grantee)
             )
 
-        previous.is_current = False
-        previous.superseded_at = datetime.now(UTC)
         await db.flush()
 
         await kb_service.increment_document_count(db, previous.knowledge_base_id, delta=1)
-        await _evict_cached_answers(doc_ids=[previous.id], kb_ids=[previous.knowledge_base_id])
 
         logger.info(
             "document_version_created",

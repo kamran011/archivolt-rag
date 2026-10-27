@@ -189,6 +189,7 @@ class IngestionService:
 
             document.chunk_count = len(chunk_rows)
             document.status = DocumentStatus.ready
+            await self._supersede_previous(db, document)
             document.error_message = None
             document.parsing_metadata = {
                 **(document.parsing_metadata or {}),
@@ -250,6 +251,16 @@ class IngestionService:
             document.error_message = str(e)[:2000]
             await db.flush()
             raise
+
+    async def _supersede_previous(self, db: AsyncSession, document: Document) -> None:
+        """A new version replaces the one it supersedes only once it is ingested and ready,
+        in the same transaction, so there is never a window with no current version."""
+        if not document.supersedes_document_id:
+            return
+        previous = await db.get(Document, document.supersedes_document_id)
+        if previous is not None and previous.is_current:
+            previous.is_current = False
+            previous.superseded_at = datetime.now(UTC)
 
     async def _store_rows(self, db: AsyncSession, document: Document, records: list[dict]) -> None:
         """Keep tabular rows in queryable form (structured_query). Bulk insert in batches."""
