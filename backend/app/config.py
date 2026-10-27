@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     DECISION_LLM_MODEL: str = ""  # empty -> RERANKER_MODEL
     # jev: external decision service (JSON over HTTPS, contract in decisions/jev_provider.py).
     JEV_ENDPOINT: str = ""
-    JEV_API_KEY: str = ""
+    JEV_API_KEY: str = ""  # also accepted as TYPESAFE_API_KEY; set via env/.env, never commit
     JEV_TIMEOUT_S: float = 5.0
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence
     SUFFICIENCY_HIGH_CONFIDENCE: float = 0.8  # a reranker score this high overrides lexical gaps
@@ -171,3 +171,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+if not settings.JEV_API_KEY:
+    import os
+
+    settings.JEV_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
