@@ -756,17 +756,16 @@ class RAGService:
                 yield event
             return
         parts: list[str] = []
-        done: dict | None = None
         async for event in self._query_stream_uncached(db, org_id, request, scope, actor):
             if event["type"] == "token":
                 parts.append(event["content"])
             elif event["type"] == "done":
-                done = event
+                # Store before sending the final event: once the client has it, it may close
+                # the connection and code after the last yield would never run.
+                response = response_cache.response_from_stream("".join(parts), event)
+                if response is not None:
+                    await response_cache.store(db, org_id, request, scope, response)
             yield event
-        if done is not None:
-            response = response_cache.response_from_stream("".join(parts), done)
-            if response is not None:
-                await response_cache.store(db, org_id, request, scope, response)
 
     async def _query_stream_uncached(
         self,

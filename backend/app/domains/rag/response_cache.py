@@ -54,12 +54,18 @@ def is_standalone(query: str) -> bool:
 def is_cacheable_request(request: RAGRequest) -> bool:
     """Cache stateless questions, and questions inside a conversation that stand on their
     own (the history cannot change what they ask)."""
-    return (
-        settings.ENABLE_RESPONSE_CACHE
-        and not request.agentic
-        and not request.web_search
-        and (not request.conversation_history or is_standalone(request.query))
-    )
+    if not settings.ENABLE_RESPONSE_CACHE:
+        return False
+    reason = None
+    if request.agentic:
+        reason = "agentic"
+    elif request.web_search:
+        reason = "web_search"
+    elif request.conversation_history and not is_standalone(request.query):
+        reason = "follow_up_question"
+    if reason:
+        logger.info("response_cache_skip", reason=reason)
+    return reason is None
 
 
 def _scope_fingerprint(scope: AccessScope | None) -> str:
@@ -119,11 +125,13 @@ async def lookup(
     key = cache_key(org_id, request, scope)
     entry = await safe(cache.get_json(key))
     if not entry:
+        logger.info("response_cache_miss", key=key[5:17])
         return None
     if not await _verify(db, org_id, scope, entry["docs"]):
         await safe(cache.delete(key))
-        logger.info("response_cache_stale_on_hit", key=key[:16])
+        logger.info("response_cache_stale_on_hit", key=key[5:17])
         return None
+    logger.info("response_cache_hit", key=key[5:17])
     response = RAGResponse.model_validate(entry["response"])
     # A hit costs nothing. It gets its own trace id (the original's is a primary key) so the
     # trace list shows that this answer was served from cache.
@@ -203,8 +211,10 @@ async def store(
     response: RAGResponse,
 ) -> None:
     if response.abstained or not response.citations:
+        logger.info("response_cache_not_stored", reason="abstained or no citations")
         return
     if any(c.source_type != "internal" for c in response.citations):
+        logger.info("response_cache_not_stored", reason="external citations")
         return
     doc_ids = {c.document_id for c in response.citations}
     versions = dict(
@@ -215,6 +225,7 @@ async def store(
         ).all()
     )
     if set(versions) != doc_ids:
+        logger.info("response_cache_not_stored", reason="cited document missing")
         return
     volatile = any(v > 1 for v in versions.values())
     ttl = settings.RESPONSE_CACHE_TTL_S
@@ -227,7 +238,8 @@ async def store(
         "response": response.model_dump(mode="json"),
         "docs": {str(d): v for d, v in versions.items()},
     }
-    await safe(cache.set_json(key, entry, ttl))
+    stored = await safe(cache.set_json(key, entry, ttl), False)
+    logger.info("response_cache_stored", key=key[5:17], ttl=ttl, ok=stored is not False)
     for doc_id in versions:
         await safe(cache.sadd(_doc_index(str(doc_id)), key, ttl))
     for kb_id in request.knowledge_base_ids:
