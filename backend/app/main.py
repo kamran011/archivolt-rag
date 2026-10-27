@@ -25,6 +25,20 @@ async def lifespan(app: FastAPI):
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("database_connected")
+    # Which optional features this process actually runs with (no secrets): makes a
+    # missing or misspelled environment variable visible at a glance.
+    logger.info(
+        "feature_flags",
+        cache_backend=settings.CACHE_BACKEND,
+        response_cache=settings.ENABLE_RESPONSE_CACHE,
+        embedding_cache=settings.ENABLE_EMBEDDING_CACHE,
+        rerank_cache=settings.ENABLE_RERANK_CACHE,
+        query_transform=settings.ENABLE_QUERY_TRANSFORM,
+        decision_provider=settings.DECISION_PROVIDER,
+        jev_key_set=bool(settings.JEV_API_KEY),
+        cost_routing=settings.ENABLE_COST_AWARE_ROUTING,
+        cheap_model=settings.CHEAP_LLM_MODEL or None,
+    )
     except Exception as e:
         logger.error("database_connection_failed", error=str(e))
     try:
