@@ -189,3 +189,99 @@ async def test_legacy_empty_rerank_entry_is_ignored():
         await cache.set(key, "[]")  # what an old poisoned entry looks like
     out = await r.rerank("q", [a], 1)
     assert out and out[0].score == 0.8
+
+
+@pytest.mark.parametrize(
+    ("question", "standalone"),
+    [
+        ("Why am I getting Error Code E-14 during preheating?", True),
+        ("What is the refund window for annual plans?", True),
+        ("What about the other model?", False),
+        ("Does it also apply to annual plans?", False),
+        ("and for the EU?", False),
+        ("why?", False),
+        ("Explain that in more detail please", False),
+    ],
+)
+def test_is_standalone(question, standalone):
+    assert response_cache.is_standalone(question) is standalone
+
+
+def test_standalone_question_in_conversation_is_cacheable(monkeypatch):
+    monkeypatch.setattr(response_cache.settings, "ENABLE_RESPONSE_CACHE", True)
+    history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
+    kb = [uuid.uuid4()]
+    ok = RAGRequest(query="Why am I getting Error Code E-14 during preheating?",
+                    knowledge_base_ids=kb, conversation_history=history)
+    follow_up = RAGRequest(query="Does it happen during baking too?",
+                           knowledge_base_ids=kb, conversation_history=history)
+    assert response_cache.is_cacheable_request(ok)
+    assert not response_cache.is_cacheable_request(follow_up)
+
+
+def test_stream_roundtrip_rebuilds_response_and_replays_events():
+    done = {
+        "type": "done",
+        "abstained": False,
+        "abstention_reason": None,
+        "verification_status": "verified",
+        "final_answer": None,
+        "citations": [{
+            "index": 1, "chunk_id": str(uuid.uuid4()), "document_id": str(uuid.uuid4()),
+            "document_title": "FAQ", "content": "E-14 means...", "relevance_score": 1.0,
+        }],
+        "claim_verifications": [],
+        "conflicts": [],
+        "evidence_gate": {"pass_gate": True, "confidence": 1.0, "top_score": 1.0, "chunk_count": 1},
+        "trace_stages": {"meta": {"strategy": "semantic"}},
+    }
+    response = response_cache.response_from_stream("E-14 means a sensor variance [1].", done)
+    assert response.answer == "E-14 means a sensor variance [1]." and len(response.citations) == 1
+    token, replay = response_cache.stream_events_for(response)
+    assert token == {"type": "token", "content": response.answer}
+    assert replay["type"] == "done" and replay["cache_hit"] and replay["final_answer"] is None
+    assert replay["citations"][0]["document_title"] == "FAQ"
+    assert replay["cost_metadata"]["estimated_cost_usd"] == 0.0
+    assert response_cache.response_from_stream("x", {"type": "done"}) is None  # unparseable
+
+
+@pytest.mark.asyncio
+async def test_query_stream_serves_second_identical_question_from_cache(monkeypatch):
+    from app.domains.rag import service as rag
+
+    monkeypatch.setattr(response_cache.settings, "ENABLE_RESPONSE_CACHE", True)
+    store = MemoryCache()
+    monkeypatch.setattr(response_cache, "get_cache", lambda: store)
+    doc = uuid.uuid4()
+    calls = []
+
+    async def fake_uncached(self, db, org_id, request, scope=None, actor=None):
+        calls.append(request.query)
+        yield {"type": "token", "content": "E-14 means a sensor variance [1]."}
+        yield {
+            "type": "done", "abstained": False, "abstention_reason": None,
+            "verification_status": "verified", "final_answer": None,
+            "citations": [{"index": 1, "chunk_id": str(uuid.uuid4()), "document_id": str(doc),
+                           "document_title": "FAQ", "content": "...", "relevance_score": 1.0}],
+            "claim_verifications": [], "conflicts": [],
+            "evidence_gate": {"pass_gate": True, "confidence": 1.0, "top_score": 1.0,
+                              "chunk_count": 1},
+            "trace_stages": {}, "trace_id": str(uuid.uuid4()),
+        }
+
+    monkeypatch.setattr(rag.RAGService, "_query_stream_uncached", fake_uncached)
+    db = AsyncMock()
+    current = MagicMock()
+    current.all.return_value = [(doc, 1)]
+    db.execute.return_value = current
+
+    history = [{"role": "user", "content": "hello"}]
+    req = RAGRequest(query="Why am I getting Error Code E-14 during preheating?",
+                     knowledge_base_ids=[uuid.uuid4()], conversation_history=history)
+    org = uuid.uuid4()
+    scope = AccessScope(uuid.uuid4())
+    first = [e async for e in rag.rag_service.query_stream(db, org, req, scope)]
+    second = [e async for e in rag.rag_service.query_stream(db, org, req, scope)]
+    assert calls == [req.query]  # the pipeline ran once
+    assert second[-1]["cache_hit"] and second[0]["content"] == first[0]["content"]
+    assert second[-1]["trace_id"] != first[-1]["trace_id"]

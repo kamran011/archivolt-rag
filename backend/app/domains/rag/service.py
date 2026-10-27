@@ -746,6 +746,36 @@ class RAGService:
         scope: AccessScope | None = None,
         actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
+        if not response_cache.is_cacheable_request(request):
+            async for event in self._query_stream_uncached(db, org_id, request, scope, actor):
+                yield event
+            return
+        cached = await response_cache.lookup(db, org_id, request, scope)
+        if cached is not None:
+            for event in response_cache.stream_events_for(cached):
+                yield event
+            return
+        parts: list[str] = []
+        done: dict | None = None
+        async for event in self._query_stream_uncached(db, org_id, request, scope, actor):
+            if event["type"] == "token":
+                parts.append(event["content"])
+            elif event["type"] == "done":
+                done = event
+            yield event
+        if done is not None:
+            response = response_cache.response_from_stream("".join(parts), done)
+            if response is not None:
+                await response_cache.store(db, org_id, request, scope, response)
+
+    async def _query_stream_uncached(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        request: RAGRequest,
+        scope: AccessScope | None = None,
+        actor: Actor | None = None,
+    ) -> AsyncIterator[dict]:
         """Same pipeline through context assembly, then streams tokens via SSE-shaped events."""
         meter = start_meter()
         trace = RetrievalTrace(query=request.query, org_id=org_id)

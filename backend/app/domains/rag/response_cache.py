@@ -15,6 +15,7 @@ TTL is only a backstop and is shortened when a cited document has been re-versio
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 
 import structlog
@@ -30,12 +31,34 @@ from app.models.document import Document
 logger = structlog.get_logger()
 
 
+# Words that make a question lean on earlier turns ("what about it?", "and the other one?").
+_REFERENCE_WORDS = frozenset(
+    """it its it's this that these those they them their theirs he she him her his hers
+    above previous earlier same former latter also again else more one ones""".split()
+)
+_FOLLOW_UP_OPENERS = ("and ", "but ", "so ", "then ", "what about", "how about", "or ")
+_MIN_STANDALONE_WORDS = 4
+
+
+def is_standalone(query: str) -> bool:
+    """Conservative check that a question means the same thing without the conversation.
+    False positives would replay an answer to a different question, so anything that might
+    refer back to earlier turns counts as a follow-up and is not cached."""
+    text = " ".join(query.lower().split())
+    words = re.findall(r"[a-z']+", text)
+    if len(words) < _MIN_STANDALONE_WORDS or text.startswith(_FOLLOW_UP_OPENERS):
+        return False
+    return not any(w in _REFERENCE_WORDS for w in words)
+
+
 def is_cacheable_request(request: RAGRequest) -> bool:
+    """Cache stateless questions, and questions inside a conversation that stand on their
+    own (the history cannot change what they ask)."""
     return (
         settings.ENABLE_RESPONSE_CACHE
         and not request.agentic
         and not request.web_search
-        and not request.conversation_history
+        and (not request.conversation_history or is_standalone(request.query))
     )
 
 
@@ -102,15 +125,74 @@ async def lookup(
         logger.info("response_cache_stale_on_hit", key=key[:16])
         return None
     response = RAGResponse.model_validate(entry["response"])
-    # A hit costs nothing and has no trace of its own.
+    # A hit costs nothing. It gets its own trace id (the original's is a primary key) so the
+    # trace list shows that this answer was served from cache.
+    trace_id = str(uuid.uuid4())
     response.retrieval_metadata = {
         **response.retrieval_metadata,
         "cache_hit": True,
+        "trace_id": trace_id,
         "estimated_cost_usd": 0.0,
         "prompt_tokens": 0,
         "completion_tokens": 0,
     }
+    response.trace_stages = {
+        "meta": {"strategy": "cache", "answer_mode": "cache", "spans": [], "total_ms": 0.0}
+    }
     return response
+
+
+def response_from_stream(answer: str, done: dict) -> RAGResponse | None:
+    """Rebuild a cacheable response from a streamed answer and its final 'done' event."""
+    try:
+        return RAGResponse.model_validate(
+            {
+                "answer": done.get("final_answer") or answer,
+                "citations": done.get("citations") or [],
+                "claim_verifications": done.get("claim_verifications") or [],
+                "conflicts": done.get("conflicts") or [],
+                "evidence_gate": done["evidence_gate"],
+                "abstained": bool(done.get("abstained")),
+                "abstention_reason": done.get("abstention_reason"),
+                "verification_status": done.get("verification_status") or "skipped",
+                "retrieval_metadata": {"strategy": (done.get("trace_stages") or {})
+                                       .get("meta", {}).get("strategy")},
+            }
+        )
+    except Exception as e:  # never let caching break a streamed answer
+        logger.warning("response_cache_stream_unparseable", error=str(e))
+        return None
+
+
+def stream_events_for(response: RAGResponse) -> list[dict]:
+    """The events a streamed answer would have produced, for a cache hit."""
+    md = response.retrieval_metadata
+    return [
+        {"type": "token", "content": response.answer},
+        {
+            "type": "done",
+            "trace_stages": response.trace_stages,
+            "abstained": response.abstained,
+            "abstention_reason": (
+                response.abstention_reason.value if response.abstention_reason else None
+            ),
+            "verification_status": response.verification_status,
+            "final_answer": None,
+            "citations": [c.model_dump(mode="json") for c in response.citations],
+            "claim_verifications": [c.model_dump() for c in response.claim_verifications],
+            "conflicts": [c.model_dump() for c in response.conflicts],
+            "evidence_gate": response.evidence_gate.model_dump(),
+            "cost_metadata": {
+                "estimated_prompt_tokens": 0,
+                "estimated_completion_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "token_count_method": "cache",
+            },
+            "trace_id": md.get("trace_id"),
+            "span_ms": {},
+            "cache_hit": True,
+        },
+    ]
 
 
 async def store(
