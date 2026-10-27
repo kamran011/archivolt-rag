@@ -499,6 +499,30 @@ only as actual workload demands it — not preemptively.
 
 ---
 
+## Upwork RAG quality issues — gap analysis (2026-10-26)
+
+Three Upwork job postings were analyzed for RAG failure patterns. All nine
+issues map to features that are already implemented or explicitly on the roadmap:
+
+| Issue | Status |
+|---|---|
+| Wrong document retrieved | **Built** — hybrid search + LLM reranker + RRF |
+| Hallucination / ignores context | **Built** — grounding prompt (7 explicit rules in `rag/prompts.py`), claim verifier, sufficiency gate |
+| Says "can't find" when answer exists | **V2 Step 1** — query planning + sub-query decomposition for follow-ups |
+| Old version quoted after update | **V2 Step 3** — versioning bug fix (supersede only after successful ingest) |
+| Users get answers from restricted docs | **Built** — `visible_document_clause(scope)` in `retrieval/access.py`, cache key includes scope |
+| Chunking strategy | **Built** — 4 strategies: fixed, structure-aware, semantic, agentic (default: structure-aware) |
+| Prompts need rewriting | **Built** — strong grounding prompt already in place; Step 0c eval provides measurable baseline |
+| Source citations with page numbers | **Built** — all chunkers store `page_number` in metadata; citation parser reads it; frontend shows `p.N` in EvidencePanel and CitationChip |
+| Eval test set | **V2 Step 0c** — 20-case eval dataset with follow-ups, comparisons, abstain cases |
+
+One configuration flag to enable after Step 4 evals pass:
+- `REQUIRE_VERIFICATION=True` (currently `False`) — makes the system abstain when the
+  claim verifier itself errors, rather than returning an unverified answer. Safe to flip
+  once the gpt-4o-mini verifier eval shows no regression on the Step 0c dataset.
+
+---
+
 ## Why this doc exists
 
 Ideas surfaced from RAG research, the Jev evaluation, and real client
