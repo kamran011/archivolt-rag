@@ -82,8 +82,9 @@ class Settings(BaseSettings):
     DECISION_PROVIDER: str = "rules"  # rules | llm | jev
     # llm: consulted only when the rules say "insufficient" (rescues synonym misses).
     DECISION_LLM_MODEL: str = ""  # empty -> RERANKER_MODEL
-    # jev: external decision service (JSON over HTTPS, contract in decisions/jev_provider.py).
-    JEV_ENDPOINT: str = ""
+    # jev: TypeSafe's Jev (System One API). Needs JEV_API_KEY (or TYPESAFE_API_KEY).
+    JEV_BASE_URL: str = "https://api.typesafe.ai"
+    JEV_MODEL: str = "jev-latest"
     JEV_API_KEY: str = ""  # also accepted as TYPESAFE_API_KEY; set via env/.env, never commit
     JEV_TIMEOUT_S: float = 5.0
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence

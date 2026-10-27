@@ -1,12 +1,10 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 
 from app.config import settings
 from app.domains.retrieval.analyzer import analyze_query
-from app.domains.retrieval.decisions.jev_provider import JevDecisionProvider
 from app.domains.retrieval.decisions.llm_provider import LLMDecisionProvider
 from app.domains.retrieval.decisions.registry import get_decision_provider
 from app.domains.retrieval.schemas import RetrievedChunk
@@ -67,28 +65,6 @@ async def test_llm_provider_never_stricter_than_rules():
     llm.generate = AsyncMock()
     assert (await LLMDecisionProvider(llm).evaluate_sufficiency(analysis, covered)).sufficient
     llm.generate.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_jev_provider_contract_and_fallback(monkeypatch):
-    monkeypatch.setattr(settings, "JEV_ENDPOINT", "https://jev.example/decide")
-    analysis = analyze_query(Q)
-
-    def handler(request: httpx.Request):
-        assert request.url.host == "jev.example"
-        return httpx.Response(200, json={"sufficient": True, "coverage": 0.8})
-
-    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    result = await JevDecisionProvider(client).evaluate_sufficiency(analysis, CHUNKS)
-    assert result.sufficient and result.coverage == 0.8
-
-    bad = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
-    assert not (await JevDecisionProvider(bad).evaluate_sufficiency(analysis, CHUNKS)).sufficient
-    junk = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"x": 1})))
-    assert not (await JevDecisionProvider(junk).evaluate_sufficiency(analysis, CHUNKS)).sufficient
-
-    monkeypatch.setattr(settings, "JEV_ENDPOINT", "")
-    assert not (await JevDecisionProvider(client).evaluate_sufficiency(analysis, CHUNKS)).sufficient
 
 
 def test_model_router(monkeypatch):

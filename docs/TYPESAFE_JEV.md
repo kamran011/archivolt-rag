@@ -51,11 +51,18 @@ at user scope, so a fresh cloud session must re-run the two install commands.
 | Claim verification | "Does passage N support claim M?" | rewrite-or-abstain policy |
 | Conflict detection | "Do these two passages disagree on <fact>?" | resolver precedence |
 
-## Current code state (read before changing it)
+## Current code state
 
-`backend/app/domains/retrieval/decisions/jev_provider.py` implements `DecisionProvider` for
-`DECISION_PROVIDER=jev` using a **placeholder JSON contract written before the real API was
-known**. It must be reworked to the real TypeSafe API (decompose sufficiency into Noul
-questions, combine in code) per the rules above. Settings: `JEV_ENDPOINT`, `JEV_API_KEY`,
-`JEV_TIMEOUT_S`. Fetch the current request/response schema from the OpenAPI spec or the
-installed SDK (Python/JS pages under https://docs.typesafe.ai/go/) — do not guess fields.
+- Client: `backend/app/providers/typesafe/client.py` — `POST {JEV_BASE_URL}/v1/systemone`,
+  `Authorization: Bearer <key>`, body `{"model", "state", "questions"}`, response
+  `{"model", "answers", "usage"}` (schema: https://api.typesafe.ai/openapi.json). Any failure
+  raises `TypeSafeError`; it is never read as a "no".
+- Questions/thresholds/truth table: `backend/app/domains/retrieval/decisions/jev_questions.py`
+  (one Noul, `states_answer`; >= 0.7 sufficient, <= 0.3 insufficient, between -> rules decide).
+- Provider: `backend/app/domains/retrieval/decisions/jev_provider.py`. Rules run first;
+  freshness/authority stay code decisions; Jev is consulted for content coverage only.
+- Settings: `DECISION_PROVIDER=jev`, `JEV_API_KEY` (or `TYPESAFE_API_KEY`),
+  `JEV_MODEL=jev-latest`, `JEV_BASE_URL=https://api.typesafe.ai`, `JEV_TIMEOUT_S=5`.
+- Logs: `jev_decision` (probability + verdict per request), `jev_decision_failed`.
+- Thresholds are TypeSafe's suggested starting points and have **not** been tuned on Ragix
+  data yet: probe with representative, hard and negative questions before relying on them.

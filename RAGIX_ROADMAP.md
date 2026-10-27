@@ -154,9 +154,8 @@ interfaces stay abstract — no Redis dependency.
 - ~~Jev DecisionProvider~~ / ~~Rules / LLM / Jev decision providers~~ —
   **built** (`decisions/llm_provider.py`, `decisions/jev_provider.py`;
   `DECISION_PROVIDER=rules|llm|jev`). Both fall back to the rules verdict on
-  any failure. **Jev's real API was not available when this was written**:
-  `jev_provider.py` documents the JSON contract it speaks and must be
-  checked against the actual service
+  any failure. Jev uses TypeSafe's real System One API
+  (`providers/typesafe/client.py`); see `docs/TYPESAFE_JEV.md`
 - ~~Parent/child retrieval~~, ~~Hierarchical summaries~~, ~~PageIndex-style
   tree reasoning~~ — **built** (`expansion.py` parents, `summary_engine.py`,
   `tree_engine.py`)
