@@ -125,7 +125,12 @@ interfaces stay abstract — no Redis dependency.
 
 ---
 
-## V2 — Adaptive RAG + Decision Layer
+## V2 — Adaptive RAG + Decision Layer *(shipped 2026-10-27)*
+
+V2 is complete. Everything below is built and verified in production logs
+(Jev gate, answer cache hits, cost routing). Items that were deliberately not
+built were moved to **V6 — Deferred until needed**, each with the trigger that
+would justify building it.
 
 - ~~Query rewriting~~ / ~~Multi-query~~ / ~~Sub-query decomposition~~ —
   **built** (`retrieval/query_transform.py`, one bounded LLM call, opt-in via
@@ -135,7 +140,7 @@ interfaces stay abstract — no Redis dependency.
   (`ingestion/dedup.py`: `chunks.content_hash`; a new version reuses the
   superseded version's vectors for unchanged chunks and records
   `chunks_embedded` / `chunks_reused` / `index_lag_seconds`). Stable
-  chunk-ID upsert and webhook/CDC triggers are still open
+  chunk-ID upsert and webhook/CDC triggers moved to V6
 - ~~Corpus-level near-duplicate document detection at ingestion~~ —
   **built** (flag-only: `parsing_metadata.near_duplicates`, threshold
   `NEAR_DUPLICATE_THRESHOLD`, exact chunk-hash overlap; no fuzzy matching).
@@ -161,7 +166,7 @@ interfaces stay abstract — no Redis dependency.
   `tree_engine.py`)
 - RAPTOR-style retrieval — **partial**: bottom-up summaries over the
   document's own heading tree exist (`summarizer.py`, `summary_index.py`);
-  clustering-based summary trees across chunks/documents do not
+  clustering-based summary trees across chunks/documents moved to V6
 - ~~SQL/structured-data retrieval foundation~~ — **built**
   (`tools/structured_query.py`, over CSV/JSON rows); a free-form SQL
   retriever against external databases is V4
@@ -196,9 +201,7 @@ below except where noted (all opt-in; defaults keep V1 behavior):
   indexes, verify-on-hit against current document version + caller access,
   volatility-scaled TTL, key includes the caller's access scope, never
   caches abstentions, history-bearing, agentic or web answers
-- Retrieval-result caching — **not built** (the answer cache plus the
-  embedding/rerank caches cover the expensive steps; add only if profiling
-  shows retrieval itself dominating)
+- Retrieval-result caching — moved to V6
 - ~~Embedding cache~~ — built (`ENABLE_EMBEDDING_CACHE`, keyed by text hash)
 - ~~Reranker-result cache~~ — built (`ENABLE_RERANK_CACHE`, keyed by chunk
   ids, which change whenever content changes)
@@ -434,6 +437,37 @@ something like SQS rather than defaulting to Redis for everything.
 
 ---
 
+## V6 — Deferred until needed
+
+Items moved out of V2 on purpose. Each is cheap to describe and expensive or
+risky to build, and none would change what users see today. Build one only when
+its trigger happens, not preemptively.
+
+- **Stable chunk-ID upserts on document edits.** Unchanged chunks already reuse
+  their embeddings (content hash), so the only saving left is database rows.
+  Upserting chunks in place conflicts with `create_new_version()`, which keeps
+  the old version's chunks for historical queries and for traces/citations that
+  reference chunk ids. Trigger: V4 sync connectors (Drive, SharePoint) editing
+  large documents often, or version storage becoming a real cost.
+- **Webhook/CDC ingestion triggers.** Uploads are the only ingestion source
+  today. Trigger: the V4 connectors (webhook processing is already a V4 infra
+  item).
+- **Retrieval-result caching.** A repeated question is served by the answer
+  cache before retrieval runs, and a different question has a different key,
+  so it would rarely hit; it would also need the same scope- and
+  version-aware invalidation as the answer cache. Trigger: profiling shows
+  retrieval itself dominating latency for non-repeated questions.
+- **RAPTOR-style clustering across chunks/documents.** Needs global
+  re-clustering and LLM summarization on every upload or edit, which conflicts
+  with per-document incremental ingestion. Heading-tree summaries already cover
+  structured documents. Trigger: evals show failures on broad, cross-document
+  questions.
+- **Jev threshold tuning.** The 0.7 / 0.3 Noul thresholds are TypeSafe's
+  suggested starting points. Trigger: an eval set built from real customer
+  documents (rules vs jev comparison), e.g. via Ragas.
+
+---
+
 ## Target architecture (extension points to preserve from V1 onward)
 
 ```
@@ -507,8 +541,8 @@ issues map to features that are already implemented or explicitly on the roadmap
 |---|---|
 | Wrong document retrieved | **Built** — hybrid search + LLM reranker + RRF |
 | Hallucination / ignores context | **Built** — grounding prompt (7 explicit rules in `rag/prompts.py`), claim verifier, sufficiency gate |
-| Says "can't find" when answer exists | **V2 Step 1** — query planning + sub-query decomposition for follow-ups |
-| Old version quoted after update | **V2 Step 3** — versioning bug fix (supersede only after successful ingest) |
+| Says "can't find" when answer exists | **Built** — adaptive query rewriting + sub-query decomposition (`retrieval/query_transform.py`) |
+| Old version quoted after update | **Bug, fixed on the V3 branch** — supersede the previous version only after the new one is ingested successfully |
 | Users get answers from restricted docs | **Built** — `visible_document_clause(scope)` in `retrieval/access.py`, cache key includes scope |
 | Chunking strategy | **Built** — 4 strategies: fixed, structure-aware, semantic, agentic (default: structure-aware) |
 | Prompts need rewriting | **Built** — strong grounding prompt already in place; Step 0c eval provides measurable baseline |
