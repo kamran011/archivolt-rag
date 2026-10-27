@@ -12,6 +12,16 @@ class NoReranker(RerankerProvider):
 
 
 def get_reranker(provider: str | None = None) -> RerankerProvider:
+    reranker = _build_reranker(provider)
+    if settings.ENABLE_RERANK_CACHE and not isinstance(reranker, NoReranker):
+        from app.core.cache import get_cache
+        from app.core.cached_providers import CachedReranker
+
+        return CachedReranker(reranker, get_cache(), settings.RERANK_CACHE_TTL_S)
+    return reranker
+
+
+def _build_reranker(provider: str | None = None) -> RerankerProvider:
     name = (provider or settings.RERANKER_PROVIDER).lower()
     if name == "cohere":
         return CohereReranker()

@@ -50,6 +50,7 @@ class EvidenceRequirement(BaseModel):
 
 class QueryAnalysis(BaseModel):
     intent: Intent
+    query: str = ""  # the analyzed question, for LLM/Jev decision providers
     terms: list[str] = Field(default_factory=list)
     wants_current: bool = False
     wants_historical: bool = False
@@ -71,6 +72,10 @@ def _key_terms(query: str) -> list[str]:
 
 
 def analyze_query(query: str) -> QueryAnalysis:
+    return _analyze(query).model_copy(update={"query": query})
+
+
+def _analyze(query: str) -> QueryAnalysis:
     q = query.strip()
     if _CHITCHAT.search(q) and len(q.split()) <= 4:
         return QueryAnalysis(intent="chitchat")

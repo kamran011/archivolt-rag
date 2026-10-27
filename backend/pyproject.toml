@@ -25,6 +25,7 @@ dependencies = [
     "pgvector>=0.3.6",
     "structlog>=24.4.0",
     "email-validator>=2.2.0",
+    "redis>=5.2.0",
 ]
 
 [project.optional-dependencies]

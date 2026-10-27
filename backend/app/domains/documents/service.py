@@ -28,6 +28,16 @@ from app.models.summary import DocumentSummary
 
 logger = structlog.get_logger()
 
+
+async def _evict_cached_answers(*, doc_ids=(), kb_ids=()) -> None:
+    """Invalidate-on-write for the answer cache (reverse indexes: document/KB -> entries)."""
+    from app.domains.rag import response_cache
+
+    for doc_id in doc_ids:
+        await response_cache.invalidate_document(doc_id)
+    for kb_id in kb_ids:
+        await response_cache.invalidate_kb(kb_id)
+
 ALLOWED_EXTENSIONS: dict[str, FileType] = {
     ".pdf": FileType.pdf,
     ".docx": FileType.docx,
@@ -135,6 +145,7 @@ class DocumentService:
         await db.flush()
 
         await kb_service.increment_document_count(db, previous.knowledge_base_id, delta=1)
+        await _evict_cached_answers(doc_ids=[previous.id], kb_ids=[previous.knowledge_base_id])
 
         logger.info(
             "document_version_created",
@@ -197,6 +208,7 @@ class DocumentService:
         if data.effective_date is not None:
             doc.effective_date = data.effective_date
         await db.flush()
+        await _evict_cached_answers(doc_ids=[doc.id])
         return doc
 
     async def _store_and_create(
@@ -320,6 +332,7 @@ class DocumentService:
         await db.delete(doc)  # cascades to chunks
         await kb_service.increment_document_count(db, doc.knowledge_base_id, delta=-1)
         await db.flush()
+        await _evict_cached_answers(doc_ids=[doc.id], kb_ids=[doc.knowledge_base_id])
 
     async def list_chunks(
         self,
@@ -442,6 +455,7 @@ class DocumentService:
         if existing.first() is None:
             db.add(DocumentAccess(organization_id=org_id, document_id=doc_id, user_id=user_id))
             await db.flush()
+            await _evict_cached_answers(doc_ids=[doc_id])
 
     async def revoke_access(
         self,
@@ -460,6 +474,7 @@ class DocumentService:
                 DocumentAccess.user_id == user_id,
             )
         )
+        await _evict_cached_answers(doc_ids=[doc_id])
 
 
 document_service = DocumentService()

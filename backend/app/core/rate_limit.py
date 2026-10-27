@@ -1,8 +1,9 @@
 """In-process sliding-window rate limiting and a per-org daily spend cap.
 
-Deliberately simple (no Redis): state lives in the worker process, so with N workers the
-effective limit is up to N times higher and everything resets on restart. The interface
-is narrow so it can be backed by a shared store later. Durable spend tracking belongs in
+Default is simple and in-process: state lives in the worker process, so with N workers the
+effective limit is up to N times higher and everything resets on restart. With
+CACHE_BACKEND=redis the per-user limits use a shared fixed-window counter instead (see
+`check_shared`), so the limit holds across workers. Durable spend tracking belongs in
 the usage ledger (see plan, stage B); this cap is a safety net, not accounting.
 """
 
@@ -76,6 +77,18 @@ class OrgBudget:
             self._spend.clear()
 
 
+async def check_shared(key: str, limit: int, window_seconds: int = 60) -> None:
+    """Fixed-window counter in the shared cache. A cache outage fails open: rate limiting
+    must not take the API down."""
+    if limit <= 0:
+        return
+    from app.core.cache import get_cache, safe
+
+    count = await safe(get_cache().incr(f"rl:{key}", window_seconds), 0)
+    if count > limit:
+        raise RateLimitError("Too many requests. Please slow down.", window_seconds)
+
+
 limiter = SlidingWindowLimiter()
 org_budget = OrgBudget()
 
@@ -86,10 +99,12 @@ def rate_limit(name: str, limit_setting: str):
     of the code path (and patched in tests)."""
 
     async def dependency(current_user: CurrentUser = Depends(require_org)) -> None:
-        limiter.check(
-            f"{name}:{current_user.organization_id}:{current_user.id}",
-            getattr(settings, limit_setting),
-        )
+        key = f"{name}:{current_user.organization_id}:{current_user.id}"
+        limit = getattr(settings, limit_setting)
+        if settings.CACHE_BACKEND.lower() == "redis":
+            await check_shared(key, limit)
+        else:
+            limiter.check(key, limit)
 
     return dependency
 

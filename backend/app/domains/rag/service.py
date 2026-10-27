@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.tracing import RetrievalTrace
 from app.domains.agent.retrieval_agent import AgentResult, retrieval_agent
+from app.domains.rag import response_cache
 from app.domains.rag.citation_parser import CitationParser
 from app.domains.rag.claim_verifier import VerificationOutcome, claim_verifier
 from app.domains.rag.conflict_detector import conflict_detector
@@ -48,6 +49,7 @@ from app.domains.tools.base import ToolContext, ToolExecutor
 from app.domains.tools.registry import default_registry
 from app.providers.cost import estimate_llm_cost, meter_total_usd, start_meter
 from app.providers.llm.base import LLMProvider
+from app.providers.llm.model_router import choose_model
 from app.providers.llm.registry import get_llm_provider
 from app.providers.reranker.registry import get_reranker
 
@@ -577,6 +579,23 @@ class RAGService:
         scope: AccessScope | None = None,
         actor: Actor | None = None,
     ) -> RAGResponse:
+        if not response_cache.is_cacheable_request(request):
+            return await self._query_uncached(db, org_id, request, scope, actor)
+        cached = await response_cache.lookup(db, org_id, request, scope)
+        if cached is not None:
+            return cached
+        response = await self._query_uncached(db, org_id, request, scope, actor)
+        await response_cache.store(db, org_id, request, scope, response)
+        return response
+
+    async def _query_uncached(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        request: RAGRequest,
+        scope: AccessScope | None = None,
+        actor: Actor | None = None,
+    ) -> RAGResponse:
         meter = start_meter()
         trace = RetrievalTrace(query=request.query, org_id=org_id)
         route = _route_query(request.query)
@@ -645,15 +664,24 @@ class RAGService:
         retrieval_metadata["chunks_in_context"] = len(selected_chunks)
 
         # 6. Generate
-        llm = get_llm_provider(request.model)
+        choice = choose_model(
+            request.model,
+            intent=ev.analysis.intent,
+            query=request.query,
+            context_tokens=context_tokens,
+        )
+        llm = get_llm_provider(choice.model)
         messages = [{"role": "system", "content": build_context_prompt(formatted_context)}]
         if request.conversation_history:
             messages.extend(request.conversation_history)
         messages.append({"role": "user", "content": request.query})
 
-        with trace.span("generation", model=request.model):
+        with trace.span("generation", model=choice.model, routed=choice.routed):
             llm_response = await llm.generate(messages, temperature=request.temperature)
 
+        retrieval_metadata["model_used"] = choice.model
+        if choice.routed:
+            retrieval_metadata["model_routed"] = choice.reason
         retrieval_metadata["prompt_tokens"] = llm_response.prompt_tokens
         retrieval_metadata["completion_tokens"] = llm_response.completion_tokens
 
@@ -764,19 +792,25 @@ class RAGService:
                 filtered = await expand_with_neighbors(db, org_id, filtered, scope=scope)
             if ev.mode_used != "cag" and settings.ENABLE_PARENT_EXPANSION:
                 filtered = await expand_with_parents(db, org_id, filtered, scope=scope)
-            selected_chunks, _ = ContextAssembler.assemble(
+            selected_chunks, context_tokens = ContextAssembler.assemble(
                 filtered, max_tokens=settings.CAG_MAX_TOKENS if ev.mode_used == "cag" else None
             )
             formatted_context = ContextAssembler.format_with_citations(selected_chunks)
 
-        llm = get_llm_provider(request.model)
+        choice = choose_model(
+            request.model,
+            intent=ev.analysis.intent,
+            query=request.query,
+            context_tokens=context_tokens,
+        )
+        llm = get_llm_provider(choice.model)
         messages = [{"role": "system", "content": build_context_prompt(formatted_context)}]
         if request.conversation_history:
             messages.extend(request.conversation_history)
         messages.append({"role": "user", "content": request.query})
 
         full_answer_parts: list[str] = []
-        with trace.span("generation", model=request.model):
+        with trace.span("generation", model=choice.model, routed=choice.routed):
             async for token in llm.stream(messages, temperature=request.temperature):
                 full_answer_parts.append(token)
                 yield {"type": "token", "content": token}
@@ -797,7 +831,9 @@ class RAGService:
         prompt_text = "\n".join(m["content"] for m in messages)
         estimated_prompt_tokens = _token_estimate.count(prompt_text)
         estimated_completion_tokens = _token_estimate.count(full_answer)
-        streamed_cost = estimate_llm_cost(estimated_prompt_tokens, estimated_completion_tokens, request.model)
+        streamed_cost = estimate_llm_cost(
+            estimated_prompt_tokens, estimated_completion_tokens, choice.model
+        )
         estimated_cost = round(meter_total_usd(meter) + streamed_cost, 6)
 
         trace_summary = trace.finish(
