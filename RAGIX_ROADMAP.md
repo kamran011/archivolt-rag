@@ -127,32 +127,47 @@ interfaces stay abstract — no Redis dependency.
 
 ## V2 — Adaptive RAG + Decision Layer
 
-- Query rewriting
-- Multi-query
-- Sub-query decomposition
-- Incremental, content-hash-based re-embedding (detect which chunks
-  actually changed instead of re-embedding the whole document)
-- Corpus-level near-duplicate document detection at ingestion — confirmed
-  gap (audited 2026-10-08): `evidence.py`'s Jaccard dedup only runs at
+- ~~Query rewriting~~ / ~~Multi-query~~ / ~~Sub-query decomposition~~ —
+  **built** (`retrieval/query_transform.py`, one bounded LLM call, opt-in via
+  `ENABLE_QUERY_TRANSFORM`; extra queries fused with RRF in `rag/service.py`;
+  falls back to the original query on any failure)
+- ~~Incremental, content-hash-based re-embedding~~ — **built**
+  (`ingestion/dedup.py`: `chunks.content_hash`; a new version reuses the
+  superseded version's vectors for unchanged chunks and records
+  `chunks_embedded` / `chunks_reused` / `index_lag_seconds`). Stable
+  chunk-ID upsert and webhook/CDC triggers are still open
+- ~~Corpus-level near-duplicate document detection at ingestion~~ —
+  **built** (flag-only: `parsing_metadata.near_duplicates`, threshold
+  `NEAR_DUPLICATE_THRESHOLD`, exact chunk-hash overlap; no fuzzy matching).
+  Original gap (audited 2026-10-08): `evidence.py`'s Jaccard dedup only runs at
   query time on already-retrieved chunks. Nothing detects "this new
   upload is 90% the same content as an existing document" at ingestion
   time, so the same paragraph can sit indexed under several documents and
   silently compete/contradict at query time
-- Adaptive retrieval
-- Iterative retrieval
-- Query routing
-- Retrieval strategy routing
-- Retrieval/relevance scoring
-- Evidence sufficiency decisions
-- Cost-aware model routing
-- Jev DecisionProvider
-- Rules / LLM / Jev decision providers
-- Parent/child retrieval
-- Hierarchical summaries
-- RAPTOR-style retrieval
-- PageIndex-style/tree reasoning
-- SQL/structured-data retrieval foundation
-- External API/application-data retrieval
+- ~~Adaptive retrieval / Iterative retrieval / Query routing / Retrieval
+  strategy routing / Retrieval-relevance scoring / Evidence sufficiency
+  decisions~~ — **built** (V1-era: `analyzer.py`, `query_router.py`,
+  `expansion.py`, `evidence_gate.py`, `sufficiency.py`)
+- ~~Cost-aware model routing~~ — **built** (`providers/llm/model_router.py`,
+  opt-in `ENABLE_COST_AWARE_ROUTING` + `CHEAP_LLM_MODEL`; only downgrades the
+  default model for simple, small-context questions)
+- ~~Jev DecisionProvider~~ / ~~Rules / LLM / Jev decision providers~~ —
+  **built** (`decisions/llm_provider.py`, `decisions/jev_provider.py`;
+  `DECISION_PROVIDER=rules|llm|jev`). Both fall back to the rules verdict on
+  any failure. **Jev's real API was not available when this was written**:
+  `jev_provider.py` documents the JSON contract it speaks and must be
+  checked against the actual service
+- ~~Parent/child retrieval~~, ~~Hierarchical summaries~~, ~~PageIndex-style
+  tree reasoning~~ — **built** (`expansion.py` parents, `summary_engine.py`,
+  `tree_engine.py`)
+- RAPTOR-style retrieval — **partial**: bottom-up summaries over the
+  document's own heading tree exist (`summarizer.py`, `summary_index.py`);
+  clustering-based summary trees across chunks/documents do not
+- ~~SQL/structured-data retrieval foundation~~ — **built**
+  (`tools/structured_query.py`, over CSV/JSON rows); a free-form SQL
+  retriever against external databases is V4
+- ~~External API/application-data retrieval~~ — **built**
+  (`tools/external_api.py`: allowlisted, read-only, HTTPS-only, org opt-in)
 
 **Prerequisite before this version starts:** extract `DecisionProvider` as
 an ABC (`Rules`, `LLM`, and a `Jev` implementation) so sufficiency/routing
@@ -174,15 +189,26 @@ replacement — document-level versioning stays the source of truth for
 "what does the reader see," chunk-hash diffing is purely an embedding-cost
 optimization on top of it.
 
-**Redis introduced here**, where it provides measurable value:
-- RAG response/query caching
-- Retrieval-result caching
-- Embedding cache
-- Reranker-result cache
-- Query normalization/cache keys
-- Rate limiting
-- Short-lived agent state
-- Distributed locks where needed
+**Redis introduced here** (`core/cache.py`: `Cache` ABC with `MemoryCache`
+default and `RedisCache`, `CACHE_BACKEND=memory|redis`) — **built** for the items
+below except where noted (all opt-in; defaults keep V1 behavior):
+- ~~RAG response/query caching~~ — built (`rag/response_cache.py`,
+  `ENABLE_RESPONSE_CACHE`): invalidate-on-write via document/KB reverse
+  indexes, verify-on-hit against current document version + caller access,
+  volatility-scaled TTL, key includes the caller's access scope, never
+  caches abstentions, history-bearing, agentic or web answers
+- Retrieval-result caching — **not built** (the answer cache plus the
+  embedding/rerank caches cover the expensive steps; add only if profiling
+  shows retrieval itself dominating)
+- ~~Embedding cache~~ — built (`ENABLE_EMBEDDING_CACHE`, keyed by text hash)
+- ~~Reranker-result cache~~ — built (`ENABLE_RERANK_CACHE`, keyed by chunk
+  ids, which change whenever content changes)
+- ~~Query normalization/cache keys~~ — built (whitespace/case-normalized)
+- ~~Rate limiting~~ — built (shared fixed-window counter when
+  `CACHE_BACKEND=redis`; fails open on cache outage)
+- Short-lived agent state — V3 (agent state/workflow state live there)
+- ~~Distributed locks where needed~~ — built (per-document ingestion lock
+  in `ingestion/jobs.py`)
 
 **Caching must be correctness-safe, not just a TTL.** A naive "cache by
 embedding similarity above a threshold" or "cache for N minutes" design

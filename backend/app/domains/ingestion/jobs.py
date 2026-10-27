@@ -7,6 +7,7 @@ import uuid
 import structlog
 from sqlalchemy import update
 
+from app.core.cache import get_cache
 from app.core.exceptions import IngestionError, NotFoundError, ValidationError
 from app.domains.ingestion.service import ingestion_service
 from app.domains.jobs import sessions
@@ -53,6 +54,15 @@ async def _mark_document_failed(doc_id: uuid.UUID, message: str) -> None:
 
 async def _run(job: Job) -> None:
     doc_id = uuid.UUID(job.payload["doc_id"])
+    # One worker per document at a time (shared lock when CACHE_BACKEND=redis). A busy
+    # lock is transient: the job is retried with backoff instead of double-processing.
+    async with get_cache().lock(f"ingest:{doc_id}", ttl=1800) as acquired:
+        if not acquired:
+            raise RuntimeError(f"document {doc_id} is already being ingested")
+        await _ingest(job, doc_id)
+
+
+async def _ingest(job: Job, doc_id: uuid.UUID) -> None:
     reprocess = bool(job.payload.get("reprocess"))
     async with sessions.new_session() as db:
         try:
@@ -61,6 +71,12 @@ async def _run(job: Job) -> None:
             else:
                 await ingestion_service.ingest_document(db, doc_id)
             await db.commit()
+            # New content is visible now: evict cached answers for this knowledge base.
+            document = await db.get(Document, doc_id)
+            if document:
+                from app.domains.rag import response_cache
+
+                await response_cache.invalidate_kb(document.knowledge_base_id)
         except (IngestionError, ValidationError, NotFoundError) as e:
             await db.rollback()
             # Bad file / missing record: retrying cannot help.

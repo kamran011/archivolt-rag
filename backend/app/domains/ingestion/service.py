@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import delete, insert
@@ -8,6 +9,11 @@ from app.config import settings
 from app.core.exceptions import IngestionError, NotFoundError
 from app.domains.documents.storage import storage_service
 from app.domains.ingestion.chunkers import get_chunker
+from app.domains.ingestion.dedup import (
+    content_hash,
+    find_near_duplicates,
+    load_reusable_embeddings,
+)
 from app.domains.ingestion.parsers import get_parser
 from app.domains.ingestion.summarizer import summarize_tree
 from app.domains.ingestion.summary_index import build_summary_rows
@@ -92,9 +98,20 @@ class IngestionService:
             document.status = DocumentStatus.embedding
             await db.flush()
 
-            texts = [c.content for c in chunk_data_list]
-            embeddings = await embedding_provider.embed_texts(texts)
-            embedding_token_total = sum(c.token_count for c in chunk_data_list)
+            # Unchanged chunks of the version this one supersedes keep their vectors;
+            # only new/edited chunks are embedded.
+            hashes = [content_hash(c.content) for c in chunk_data_list]
+            reusable = await load_reusable_embeddings(db, document.supersedes_document_id, hashes)
+            to_embed = [i for i, h in enumerate(hashes) if h not in reusable]
+            new_vectors = (
+                await embedding_provider.embed_texts([chunk_data_list[i].content for i in to_embed])
+                if to_embed
+                else []
+            )
+            embeddings = [reusable.get(h) for h in hashes]
+            for i, vector in zip(to_embed, new_vectors, strict=True):
+                embeddings[i] = vector
+            embedding_token_total = sum(chunk_data_list[i].token_count for i in to_embed)
             # Semantic chunking embeds sentences of split sections a second time.
             embedding_token_total += getattr(chunker, "embedding_tokens", 0)
             chunking_llm_cost = 0.0
@@ -107,7 +124,9 @@ class IngestionService:
             chunk_rows = []
             flagged_chunk_count = 0
 
-            for chunk_data, embedding in zip(chunk_data_list, embeddings, strict=True):
+            for chunk_data, embedding, chunk_hash in zip(
+                chunk_data_list, embeddings, hashes, strict=True
+            ):
                 # Audit-only: flag suspicious instruction-like patterns so
                 # operators can review, without blocking ingestion — injected
                 # text in a document is still legitimate content (see
@@ -131,6 +150,7 @@ class IngestionService:
                         document_id=document.id,
                         knowledge_base_id=document.knowledge_base_id,
                         content=chunk_data.content,
+                        content_hash=chunk_hash,
                         chunk_index=chunk_data.chunk_index,
                         token_count=chunk_data.token_count,
                         metadata_=metadata,
@@ -155,14 +175,32 @@ class IngestionService:
                 )
                 db.add_all(summary_rows)
 
+            near_duplicates = (
+                await find_near_duplicates(db, document, hashes, settings.NEAR_DUPLICATE_THRESHOLD)
+                if settings.NEAR_DUPLICATE_THRESHOLD > 0
+                else []
+            )
+            created = document.created_at
+            index_lag = (
+                round((datetime.now(UTC) - created).total_seconds(), 3)
+                if created is not None and created.tzinfo is not None
+                else None
+            )
+
             document.chunk_count = len(chunk_rows)
             document.status = DocumentStatus.ready
             document.error_message = None
             document.parsing_metadata = {
                 **(document.parsing_metadata or {}),
                 "tree": tree_to_json(tree_nodes),
-                **({"injection_flagged_chunks": flagged_chunk_count} if flagged_chunk_count else {}),
+                **(
+                    {"injection_flagged_chunks": flagged_chunk_count} if flagged_chunk_count else {}
+                ),
                 "embedding_tokens": embedding_token_total,
+                "chunks_embedded": len(to_embed),
+                "chunks_reused": len(chunk_rows) - len(to_embed),
+                **({"near_duplicates": near_duplicates} if near_duplicates else {}),
+                **({"index_lag_seconds": index_lag} if index_lag is not None else {}),
                 **(
                     {
                         "summaries_indexed": len(summary_rows),
@@ -184,6 +222,13 @@ class IngestionService:
                 ),
             }
             await db.flush()
+
+            if near_duplicates:
+                logger.warning(
+                    "document_near_duplicate_detected",
+                    doc_id=str(doc_id),
+                    matches=near_duplicates,
+                )
 
             if flagged_chunk_count:
                 logger.warning(

@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     # LLM
     DEFAULT_LLM_MODEL: str = "gpt-4o"
     RERANKER_MODEL: str = "gpt-4o-mini"
+    # Cost-aware routing: answer simple, small-context questions with CHEAP_LLM_MODEL.
+    ENABLE_COST_AWARE_ROUTING: bool = False
+    CHEAP_LLM_MODEL: str = ""
+    ROUTING_SIMPLE_MAX_CONTEXT_TOKENS: int = 1500
     RERANKER_PROVIDER: str = "llm"  # llm | cohere | none
     COHERE_API_KEY: str = ""
     COHERE_RERANK_MODEL: str = "rerank-v3.5"
@@ -75,7 +79,13 @@ class Settings(BaseSettings):
     CAG_MAX_TOKENS: int = 12000
     # Sufficiency gate: does the evidence cover what the question needs?
     ENABLE_SUFFICIENCY_GATE: bool = True
-    DECISION_PROVIDER: str = "rules"  # rules | llm | jev (llm/jev land in V2)
+    DECISION_PROVIDER: str = "rules"  # rules | llm | jev
+    # llm: consulted only when the rules say "insufficient" (rescues synonym misses).
+    DECISION_LLM_MODEL: str = ""  # empty -> RERANKER_MODEL
+    # jev: external decision service (JSON over HTTPS, contract in decisions/jev_provider.py).
+    JEV_ENDPOINT: str = ""
+    JEV_API_KEY: str = ""
+    JEV_TIMEOUT_S: float = 5.0
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence
     SUFFICIENCY_HIGH_CONFIDENCE: float = 0.8  # a reranker score this high overrides lexical gaps
     MAX_RETRIEVAL_EXPANSIONS: int = 2  # extra strategies tried when evidence is insufficient
@@ -97,10 +107,17 @@ class Settings(BaseSettings):
     # Abstain (instead of answering and exposing the conflict) when sources disagree
     # and the resolver cannot pick a winner.
     ABSTAIN_ON_UNRESOLVED_CONFLICT: bool = False
+    # Query rewriting + multi-query + sub-query decomposition: one cheap LLM call per RAG
+    # request (RERANKER_MODEL). Extra queries are searched and fused with RRF.
+    ENABLE_QUERY_TRANSFORM: bool = False
+    QUERY_TRANSFORM_MAX_EXTRA: int = 3
     ENABLE_NEIGHBOR_EXPANSION: bool = True
     # Also pull in the rest of a hit's section (parent context). Off by default: it can add
     # a lot of text; the context budget still bounds what reaches the LLM.
     ENABLE_PARENT_EXPANSION: bool = False
+    # Flag (never block) a new upload sharing at least this fraction of chunks with another
+    # current document in the same KB. 0 disables the check.
+    NEAR_DUPLICATE_THRESHOLD: float = 0.9
     ENABLE_SECTION_SUMMARIES: bool = False  # costs one LLM call per section at ingest
 
     # Agentic retrieval (opt-in per request; hard bounds on every run)
@@ -115,6 +132,9 @@ class Settings(BaseSettings):
     WEB_SEARCH_PROVIDER: str = "brave"  # brave | none
     BRAVE_API_KEY: str = ""
     WEB_SEARCH_MAX_RESULTS: int = 5
+    # JSON allowlist of read-only application APIs for the external_api tool (see
+    # domains/tools/external_api.py). Empty disables the tool.
+    EXTERNAL_API_SOURCES: str = ""
     TOOL_TIMEOUT_S: float = 10.0  # default per-call timeout for agent tools
 
     # Multimodal ingestion (vision-model OCR + figure descriptions; costs per image)
@@ -130,6 +150,18 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 50
     # Per user, per organization, per minute (in-process; each worker counts separately).
     # 0 disables the limit.
+    # Cache / coordination backend. 'memory' is per-process; 'redis' is shared across workers.
+    CACHE_BACKEND: str = "memory"  # memory | redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    ENABLE_EMBEDDING_CACHE: bool = False
+    ENABLE_RERANK_CACHE: bool = False
+    EMBEDDING_CACHE_TTL_S: int = 7 * 24 * 3600  # embeddings of identical text never go stale
+    RERANK_CACHE_TTL_S: int = 3600
+    # Whole-answer cache. Invalidated on write (document/KB reverse index), re-verified on
+    # hit against current document versions; TTL is only a backstop.
+    ENABLE_RESPONSE_CACHE: bool = False
+    RESPONSE_CACHE_TTL_S: int = 3600
+    RESPONSE_CACHE_VOLATILE_DIVISOR: int = 4  # shorter TTL when a cited document was edited
     RATE_LIMIT_CHAT_PER_MIN: int = 20
     RATE_LIMIT_SEARCH_PER_MIN: int = 60
     RATE_LIMIT_UPLOAD_PER_MIN: int = 20

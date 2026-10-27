@@ -1,0 +1,129 @@
+import uuid
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from app.core.cache import MemoryCache, safe
+from app.core.cached_providers import CachedEmbeddingProvider, CachedReranker
+from app.domains.rag import response_cache
+from app.domains.rag.schemas import RAGRequest
+from app.domains.retrieval.access import AccessScope
+from app.domains.retrieval.schemas import RetrievedChunk
+
+
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+@pytest.mark.asyncio
+async def test_memory_cache_ttl_sets_incr_and_lock():
+    clock = Clock()
+    c = MemoryCache(clock=clock)
+    await c.set("k", "v", ttl=10)
+    assert await c.get("k") == "v"
+    clock.t = 11
+    assert await c.get("k") is None
+
+    await c.sadd("idx", "a")
+    await c.sadd("idx", "b")
+    await c.set("a", "1")
+    await c.set("b", "2")
+    assert await c.invalidate_index("idx") == 2
+    assert await c.get("a") is None and await c.smembers("idx") == set()
+
+    assert [await c.incr("n", 5) for _ in range(3)] == [1, 2, 3]
+    clock.t = 20
+    assert await c.incr("n", 5) == 1
+
+    async with c.lock("x") as got:
+        assert got
+        async with c.lock("x") as again:
+            assert not again
+    async with c.lock("x") as got:
+        assert got
+
+
+@pytest.mark.asyncio
+async def test_memory_cache_lru_bound():
+    c = MemoryCache(max_entries=2)
+    for k in "abc":
+        await c.set(k, k)
+    assert await c.get("a") is None and await c.get("c") == "c"
+
+
+@pytest.mark.asyncio
+async def test_safe_swallows_backend_errors():
+    async def boom():
+        raise ConnectionError("redis down")
+
+    assert await safe(boom(), "fallback") == "fallback"
+
+
+@pytest.mark.asyncio
+async def test_cached_embeddings_only_embed_misses():
+    inner = MagicMock(model_name="m", dimensions=2)
+    inner.embed_texts = AsyncMock(side_effect=lambda ts: [[float(len(t)), 0.0] for t in ts])
+    p = CachedEmbeddingProvider(inner, MemoryCache(), ttl=60)
+    assert await p.embed_texts(["aa", "b"]) == [[2.0, 0.0], [1.0, 0.0]]
+    assert await p.embed_texts(["aa", "ccc"]) == [[2.0, 0.0], [3.0, 0.0]]
+    assert inner.embed_texts.await_args_list[1].args[0] == ["ccc"]
+
+
+def _chunk(score):
+    cid = uuid.uuid4()
+    return RetrievedChunk(
+        chunk_id=cid, document_id=cid, document_title="t", content="c", score=score,
+        metadata={}, retrieval_method="hybrid",
+    )
+
+
+@pytest.mark.asyncio
+async def test_cached_reranker_reuses_order_and_scores():
+    a, b = _chunk(0.1), _chunk(0.2)
+    inner = MagicMock()
+    inner.rerank = AsyncMock(return_value=[b.model_copy(update={"score": 0.9}), a])
+    r = CachedReranker(inner, MemoryCache(), ttl=60)
+    first = await r.rerank("Q  x", [a, b], 2)
+    second = await r.rerank("q x", [b, a], 2)
+    assert inner.rerank.await_count == 1
+    assert [c.chunk_id for c in second] == [c.chunk_id for c in first]
+    assert second[0].score == 0.9
+
+
+def test_response_cache_key_separates_scopes_and_normalizes_query(monkeypatch):
+    org, kb = uuid.uuid4(), uuid.uuid4()
+    req = RAGRequest(query="What is  the Policy?", knowledge_base_ids=[kb])
+    same = RAGRequest(query="what is the policy?", knowledge_base_ids=[kb])
+    u1, u2 = uuid.uuid4(), uuid.uuid4()
+    k = response_cache.cache_key
+    assert k(org, req, AccessScope(u1)) == k(org, same, AccessScope(u1))
+    assert k(org, req, AccessScope(u1)) != k(org, req, AccessScope(u2))
+    assert k(org, req, AccessScope(u1)) != k(org, req, AccessScope(u1, is_admin=True))
+
+
+def test_response_cache_cacheability(monkeypatch):
+    monkeypatch.setattr(response_cache.settings, "ENABLE_RESPONSE_CACHE", True)
+    kb = [uuid.uuid4()]
+    assert response_cache.is_cacheable_request(RAGRequest(query="q", knowledge_base_ids=kb))
+    for kw in ({"agentic": True}, {"web_search": True}, {"conversation_history": [{"role": "user", "content": "x"}]}):
+        assert not response_cache.is_cacheable_request(RAGRequest(query="q", knowledge_base_ids=kb, **kw))
+    monkeypatch.setattr(response_cache.settings, "ENABLE_RESPONSE_CACHE", False)
+    assert not response_cache.is_cacheable_request(RAGRequest(query="q", knowledge_base_ids=kb))
+
+
+@pytest.mark.asyncio
+async def test_verify_on_hit_rejects_new_version_or_missing_doc():
+    org, doc = uuid.uuid4(), uuid.uuid4()
+    db = AsyncMock()
+    result = MagicMock()
+    db.execute.return_value = result
+    result.all.return_value = [(doc, 1)]
+    assert await response_cache._verify(db, org, AccessScope(None, True), {str(doc): 1})
+    result.all.return_value = [(doc, 2)]  # re-versioned
+    assert not await response_cache._verify(db, org, AccessScope(None, True), {str(doc): 1})
+    result.all.return_value = []  # superseded / deleted / no longer visible
+    assert not await response_cache._verify(db, org, AccessScope(None, True), {str(doc): 1})
