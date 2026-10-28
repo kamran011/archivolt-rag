@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useOrganization } from "@/providers/OrganizationProvider";
 import { useCurrentUser } from "@/providers/CurrentUserProvider";
-import type { OrgMember, OrgRole } from "@/lib/types";
+import type { EscalationSettings, OrgMember, OrgRole } from "@/lib/types";
 
 interface OrgInvitation {
   id: string;
@@ -46,6 +46,16 @@ export default function SettingsPage() {
     "Failed to load invitations",
   );
 
+  const {
+    data: escSettings,
+    refresh: reloadEsc,
+  } = useApiResource<EscalationSettings>(
+    canManage && orgId ? `/api/v1/escalations/settings` : null,
+    orgId,
+    "Failed to load handoff settings",
+  );
+  const [escDraft, setEscDraft] = useState<EscalationSettings | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
@@ -69,6 +79,24 @@ export default function SettingsPage() {
   }
 
   const webSearchOn = org.settings?.web_search_enabled === true;
+
+  const defaultEsc: EscalationSettings = {
+    enabled: false,
+    triggers: ["user_request", "frustration", "abstain"],
+    emails: [],
+    slack_webhook_url: null,
+    customer_message: "Your question has been forwarded to our support team. Someone will be in touch shortly.",
+  };
+
+  const esc = escDraft ?? escSettings ?? defaultEsc;
+
+  async function saveEsc() {
+    await run(async () => {
+      await api.put(`/api/v1/escalations/settings`, esc, org.id);
+      setEscDraft(null);
+      await reloadEsc();
+    });
+  }
 
   return (
     <div>
@@ -339,6 +367,110 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
+
+      {canManage && (
+        <section className={`relative bg-bg-white rounded-2xl border border-border p-5 mt-6 transition-opacity duration-200 ${busy ? "opacity-60 pointer-events-none" : ""}`}>
+          {busy && <div className="skeleton absolute inset-0 rounded-2xl opacity-30" aria-hidden />}
+          <h2 className="font-medium text-gray-900 mb-1">Human handoff</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            When a customer asks for a human, sounds frustrated, or receives an abstained answer,
+            the conversation can be escalated. Admins receive a notification and can resolve the
+            escalation from the Escalations page.
+          </p>
+
+          <label className="flex items-center gap-2 text-sm mb-4">
+            <input
+              type="checkbox"
+              checked={esc.enabled}
+              disabled={busy}
+              onChange={(e) => setEscDraft({ ...esc, enabled: e.target.checked })}
+            />
+            Enable human handoff for this organization
+          </label>
+
+          {esc.enabled && (
+            <div className="space-y-4">
+              <fieldset>
+                <legend className="text-xs font-medium text-gray-700 mb-2">Trigger conditions</legend>
+                <div className="flex flex-wrap gap-4">
+                  {(["user_request", "frustration", "abstain"] as const).map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={esc.triggers.includes(t)}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...esc.triggers, t]
+                            : esc.triggers.filter((x) => x !== t);
+                          setEscDraft({ ...esc, triggers: next });
+                        }}
+                      />
+                      {t === "user_request" ? "Customer asks for a human" : t === "frustration" ? "Customer sounds frustrated" : "Abstained answer"}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Notification emails <span className="text-gray-400 font-normal">(one per line)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={esc.emails.join("\n")}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setEscDraft({
+                      ...esc,
+                      emails: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                  placeholder="admin@example.com"
+                  className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono resize-none disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Slack webhook URL <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="url"
+                  value={esc.slack_webhook_url ?? ""}
+                  disabled={busy}
+                  onChange={(e) => setEscDraft({ ...esc, slack_webhook_url: e.target.value || null })}
+                  placeholder="https://hooks.slack.com/services/..."
+                  className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Message shown to the customer when escalated
+                </label>
+                <textarea
+                  rows={3}
+                  value={esc.customer_message}
+                  disabled={busy}
+                  onChange={(e) => setEscDraft({ ...esc, customer_message: e.target.value })}
+                  className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none disabled:opacity-60"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <button
+              disabled={busy}
+              onClick={() => void saveEsc()}
+              className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save handoff settings
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

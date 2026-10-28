@@ -301,16 +301,18 @@ Embedding cache
 - **New gap found in this audit:** fine-grained knowledge-strip
   decomposition/recombination — correction today operates at chunk
   granularity, not sub-chunk strips
-- Human escalation — make it concrete (added 2026-10-13, from a
-  customer-support chatbot job spec):
-  - Triggers: the user asks for a human, the user seems frustrated, or the
-    answer abstains (no supporting evidence in the knowledge base)
-  - Handoff: send the full conversation (messages, cited sources, abstain
-    reason) to the team via Slack or email, with a link back to the trace
-  - Escalation rules (trigger list, destination) are per-organization
-    settings, not code, so an admin can change them without a deploy
-  - Reuse the existing abstain/evidence-gate signals; don't add a new
-    classifier unless frustration detection can't be done with a rule
+- ~~Human escalation~~ — **built** (committed on `v3`, 2026-10-28):
+  - Triggers (user_request / frustration / abstain) judged by Jev with rules
+    fallback; per-org settings (enabled, triggers, emails, Slack webhook,
+    customer message). Off by default.
+  - Notifications via Resend + Slack through the job queue with retries; one
+    open escalation per conversation.
+  - Admin API at `/api/v1/escalations` (settings, list, detail, resolve).
+  - Chat: both normal and streaming paths call `maybe_escalate()`; the chat UI
+    shows a handoff notice (also restored when reopening the conversation).
+  - Settings UI: "Human handoff" section in Settings (owners/admins).
+  - Inbox: `/dashboard/escalations` with list, transcript, Resolve button,
+    `?id=` deep-link from notifications, and a sidebar entry.
 - Agent workflow/report generation
 
 **Redis for agentic workloads:**
