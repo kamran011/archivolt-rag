@@ -26,6 +26,7 @@ from app.domains.rag.schemas import (
     RAGRequest,
     RAGResponse,
     VerificationStatus,
+    compute_confidence_score,
 )
 from app.domains.rag.stages import build_stages
 from app.domains.retrieval.access import AccessScope, Actor
@@ -695,6 +696,7 @@ class RAGService:
                 evidence_gate=gate_result,
                 abstained=True,
                 abstention_reason=ev.abstention_reason,
+                confidence_score=0.0,
                 retrieval_metadata={**retrieval_metadata, "trace_id": trace_id},
                 trace_stages={
                     **build_stages(
@@ -799,6 +801,7 @@ class RAGService:
             abstained=final.abstained,
             abstention_reason=final.reason,
             verification_status=final.verification_status,
+            confidence_score=compute_confidence_score(final.claims, citations, final.abstained),
             retrieval_metadata=retrieval_metadata,
             trace_stages=trace_stages,
         )
@@ -858,6 +861,7 @@ class RAGService:
                 "type": "done",
                 "abstained": True,
                 "abstention_reason": ev.abstention_reason.value,
+                "confidence_score": 0.0,
                 "citations": [],
                 "evidence_gate": gate_result.model_dump(),
                 "trace_id": trace_id,
@@ -962,6 +966,7 @@ class RAGService:
             "abstained": final.abstained,
             "abstention_reason": final.reason.value if final.reason else None,
             "verification_status": final.verification_status,
+            "confidence_score": compute_confidence_score(final.claims, citations, final.abstained),
             # Tokens were already streamed; when verification changed the answer the client
             # replaces what it showed with this.
             "final_answer": final.answer if final.answer != full_answer else None,

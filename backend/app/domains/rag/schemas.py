@@ -83,8 +83,27 @@ class RAGResponse(BaseModel):
     abstained: bool
     abstention_reason: AbstentionReason | None = None
     verification_status: VerificationStatus = "skipped"
+    # Overall answer confidence: mean of supported-claim confidence when verification ran;
+    # falls back to the top citation relevance score; 0.0 on abstention.
+    confidence_score: float = 0.0
     retrieval_metadata: dict
     # Internal: persisted to rag_traces by the chat layer, never sent to clients.
     trace_stages: dict = Field(default_factory=dict, exclude=True)
     # Set by the chat layer when the conversation was handed to a human (V3 escalation).
     handoff: dict | None = None
+
+
+def compute_confidence_score(
+    claims: list[ClaimVerification],
+    citations: list[Citation],
+    abstained: bool,
+) -> float:
+    """Derive a [0, 1] confidence score for the answer."""
+    if abstained:
+        return 0.0
+    supported = [c for c in claims if c.status == "supported"]
+    if supported:
+        return round(sum(c.confidence for c in supported) / len(supported), 4)
+    if citations:
+        return round(max(c.relevance_score for c in citations), 4)
+    return 0.0
