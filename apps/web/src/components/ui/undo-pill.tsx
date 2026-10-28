@@ -52,6 +52,21 @@ export function UndoPill({
   const [exitReason, setExitReason] = useState<ExitReason>("expire");
   const [isPaused, setIsPaused] = useState(false);
 
+  // Reset the countdown whenever the pill (re)opens. Done during render, keyed on
+  // the previous `open`/`duration`, rather than with setState inside the effect.
+  const [shownFor, setShownFor] = useState<{ open: boolean; duration: number }>({
+    open: false,
+    duration,
+  });
+  if (open !== shownFor.open || duration !== shownFor.duration) {
+    setShownFor({ open, duration });
+    if (open) {
+      setSecondsLeft(Math.ceil(duration));
+      setExitReason("expire");
+      setIsPaused(false);
+    }
+  }
+
   const ringOffset = useMotionValue(0);
 
   const rafRef = useRef<number | null>(null);
@@ -76,9 +91,6 @@ export function UndoPill({
     focusedRef.current = false;
     lastFrameRef.current = performance.now();
     ringOffset.set(0);
-    setSecondsLeft(Math.ceil(duration));
-    setExitReason("expire");
-    setIsPaused(false);
 
     const tick = (now: number) => {
       const { onExpire: expire, pauseOnHover: pausable } = latestRef.current;

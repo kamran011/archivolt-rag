@@ -20,10 +20,10 @@ export function useConversations() {
 
   const orgId = currentOrg?.id;
 
-  const refresh = useCallback(() => {
+  // State is only set from the request's callbacks, so the effect below never
+  // sets state synchronously; `refresh` shows the spinner for manual reloads.
+  const load = useCallback(() => {
     if (!orgId) return;
-    setLoading(true);
-    setError(null);
     api
       .get<ConversationSummary[]>("/api/v1/chat/conversations", orgId)
       .then((data) => { setConversations(data); setError(null); })
@@ -33,9 +33,16 @@ export function useConversations() {
       .finally(() => setLoading(false));
   }, [orgId]);
 
+  const refresh = useCallback(() => {
+    if (!orgId) return;
+    setLoading(true);
+    setError(null);
+    load();
+  }, [orgId, load]);
+
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    load();
+  }, [load]);
 
   return { conversations, loading, error, refresh };
 }

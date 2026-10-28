@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
@@ -13,7 +13,16 @@ type Stage =
   | "done"      // success, about to redirect
   | "error";
 
+// useSearchParams needs a Suspense boundary, or the static prerender fails the build.
 export default function InviteAcceptPage() {
+  return (
+    <Suspense>
+      <InviteAccept />
+    </Suspense>
+  );
+}
+
+function InviteAccept() {
   const router = useRouter();
   const params = useSearchParams();
   const inviteId = params.get("invite");
