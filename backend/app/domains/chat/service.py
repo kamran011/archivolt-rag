@@ -6,8 +6,10 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.exceptions import NotFoundError
 from app.core.rate_limit import org_budget
+from app.domains.chat.memory import ChatMemory, build_memory
 from app.domains.chat.schemas import ChatRequest, ConversationCreate
 from app.domains.escalation.service import maybe_escalate
 from app.domains.observability.store import save_rag_trace
@@ -17,10 +19,10 @@ from app.domains.retrieval.access import AccessScope, Actor
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 from app.models.organization import Organization
+from app.providers.llm.registry import get_llm_provider
 
 logger = structlog.get_logger()
 
-MAX_HISTORY_MESSAGES = 10
 
 
 class ChatService:
@@ -125,13 +127,22 @@ class ChatService:
         org = await db.get(Organization, org_id)
         return dataclasses.replace(actor, org_settings=dict(org.settings or {}) if org else {})
 
-    async def _build_history(self, db: AsyncSession, conv: Conversation) -> list[dict]:
-        recent = (await self._load_messages(db, conv.id))[-MAX_HISTORY_MESSAGES:]
-        return [
+    async def _build_history(self, db: AsyncSession, conv: Conversation) -> ChatMemory:
+        turns = [
             {"role": m.role.value, "content": m.content}
-            for m in recent
+            for m in await self._load_messages(db, conv.id)
             if m.role in (MessageRole.user, MessageRole.assistant)
         ]
+        # Not metered: it runs before the RAG request starts its cost meter. One cheap call
+        # per CHAT_SUMMARY_BATCH messages.
+        llm = get_llm_provider(settings.RERANKER_MODEL) if settings.ENABLE_HISTORY_SUMMARY else None
+        memory = await build_memory(
+            turns, conv.history_summary, conv.summarized_message_count, llm
+        )
+        if memory.summarized_count != conv.summarized_message_count:
+            conv.history_summary = memory.summary
+            conv.summarized_message_count = memory.summarized_count
+        return memory
 
     async def send_message(
         self,
@@ -143,7 +154,8 @@ class ChatService:
         actor: Actor | None = None,
     ) -> RAGResponse:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
-        history = await self._build_history(db, conv)
+        memory = await self._build_history(db, conv)
+        history = memory.recent
         actor = await self._with_org_settings(db, org_id, actor)
 
         db.add(
@@ -158,6 +170,7 @@ class ChatService:
                 query=request.message,
                 knowledge_base_ids=request.knowledge_base_ids,
                 conversation_history=history,
+                conversation_summary=memory.summary,
                 model=request.model,
                 agentic=request.agentic,
                 web_search=request.web_search,
@@ -245,7 +258,8 @@ class ChatService:
         actor: Actor | None = None,
     ) -> AsyncIterator[dict]:
         conv = await self._resolve_conversation(db, org_id, user_id, request)
-        history = await self._build_history(db, conv)
+        memory = await self._build_history(db, conv)
+        history = memory.recent
         actor = await self._with_org_settings(db, org_id, actor)
 
         db.add(
@@ -264,6 +278,7 @@ class ChatService:
                 query=request.message,
                 knowledge_base_ids=request.knowledge_base_ids,
                 conversation_history=history,
+                conversation_summary=memory.summary,
                 model=request.model,
                 agentic=request.agentic,
                 web_search=request.web_search,

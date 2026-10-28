@@ -738,7 +738,14 @@ class RAGService:
             context_tokens=context_tokens,
         )
         llm = get_llm_provider(choice.model)
-        messages = [{"role": "system", "content": build_context_prompt(formatted_context)}]
+        messages = [
+            {
+                "role": "system",
+                "content": build_context_prompt(
+                    formatted_context, request.conversation_summary
+                ),
+            }
+        ]
         if request.conversation_history:
             messages.extend(request.conversation_history)
         messages.append({"role": "user", "content": request.query})
@@ -902,7 +909,14 @@ class RAGService:
             context_tokens=context_tokens,
         )
         llm = get_llm_provider(choice.model)
-        messages = [{"role": "system", "content": build_context_prompt(formatted_context)}]
+        messages = [
+            {
+                "role": "system",
+                "content": build_context_prompt(
+                    formatted_context, request.conversation_summary
+                ),
+            }
+        ]
         if request.conversation_history:
             messages.extend(request.conversation_history)
         messages.append({"role": "user", "content": request.query})

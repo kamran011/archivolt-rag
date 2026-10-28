@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     # request (RERANKER_MODEL). Extra queries are searched and fused with RRF.
     ENABLE_QUERY_TRANSFORM: bool = False
     QUERY_TRANSFORM_MAX_EXTRA: int = 3
+    # Summary + buffer chat memory: the last CHAT_HISTORY_WINDOW messages go verbatim; older
+    # ones are folded into a running summary (one RERANKER_MODEL call) once at least
+    # CHAT_SUMMARY_BATCH of them are waiting. Off -> plain sliding window.
+    ENABLE_HISTORY_SUMMARY: bool = True
+    CHAT_HISTORY_WINDOW: int = 10
+    CHAT_SUMMARY_BATCH: int = 6
     # Adaptive: a clear, single, self-contained question is searched as-is first and only
     # rewritten if that first search is insufficient (saves one LLM call on most questions).
     # Follow-ups, comparisons, multi-part and very short questions are rewritten up front.

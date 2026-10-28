@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -21,6 +21,12 @@ class Conversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(nullable=False, index=True)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Running summary of the oldest turns; the first `summarized_message_count`
+    # user/assistant messages are folded into it.
+    history_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summarized_message_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     messages: Mapped[list["Message"]] = relationship(
         "Message", back_populates="conversation", cascade="all, delete-orphan",

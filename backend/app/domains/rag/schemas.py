@@ -12,6 +12,8 @@ class RAGRequest(BaseModel):
     query: str
     knowledge_base_ids: list[uuid.UUID]
     conversation_history: list[dict] | None = None
+    # Summary of turns older than conversation_history; background only, never a source.
+    conversation_summary: str | None = None
     model: str = Field(default_factory=lambda: settings.DEFAULT_LLM_MODEL)
     temperature: float = 0.1
     agentic: bool = False
