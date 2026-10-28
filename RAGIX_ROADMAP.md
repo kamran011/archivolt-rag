@@ -149,6 +149,30 @@ would justify building it.
   upload is 90% the same content as an existing document" at ingestion
   time, so the same paragraph can sit indexed under several documents and
   silently compete/contradict at query time
+- ~~Exact duplicate-upload guard (same file, blocking)~~ — **built**
+  (`v3`, 2026-10-28). Found live: uploading the same `.txt` file twice through
+  the UI silently created two separate documents, each independently chunked
+  and embedded, both retrievable — so a question could cite either copy, or
+  both. `documents.file_hash` (sha256 of the raw bytes, migration
+  `20261028130000_document_file_hash.sql`) is checked in
+  `DocumentService._store_and_create`, after `sniff_content` and before
+  `storage_service.upload_file` (a rejected upload leaves no orphan file in
+  storage). An exact-byte match against another current, non-failed document
+  in the same KB is rejected with `"This file is already in this knowledge
+  base as '<title>'."`; a `create_new_version()` upload identical to the
+  version it would supersede is rejected with `"This file is identical to
+  the current version."`. A match the caller cannot see (a restricted
+  document) is treated as no match — `visible_document_clause` excludes it
+  from the query, so the upload proceeds rather than revealing that a hidden
+  document exists. This is a separate, blocking check from the flag-only
+  near-duplicate detector above it: that one catches *near*-duplicate content
+  across *different* files after ingestion; this one catches the *exact same*
+  file bytes, before storage/ingestion ever runs. Known gap: documents
+  uploaded before this shipped have no `file_hash` (backfilling would mean
+  re-downloading every file from storage), and a re-exported PDF with
+  identical text has different bytes, so it would not be caught — hashing
+  extracted text at ingestion, not raw bytes, would close that, noted as a
+  possible follow-up, not built
 - ~~Adaptive retrieval / Iterative retrieval / Query routing / Retrieval
   strategy routing / Retrieval-relevance scoring / Evidence sufficiency
   decisions~~ — **built** (V1-era: `analyzer.py`, `query_router.py`,

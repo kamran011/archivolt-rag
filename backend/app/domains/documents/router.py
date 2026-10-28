@@ -53,6 +53,7 @@ async def upload_document(
         uploaded_by=current_user.id,
         restricted=restricted,
         tags=[t for t in tags.split(",") if t.strip()],
+        scope=scope_for(current_user),
     )
     # The ingestion job is created in the same transaction as the document, so neither can
     # exist without the other. Commit before running so the job's own session sees both.

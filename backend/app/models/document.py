@@ -64,6 +64,10 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     file_type: Mapped[FileType] = mapped_column(nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     storage_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    # sha256 of the raw uploaded bytes; powers the duplicate-upload guard (see
+    # DocumentService._find_duplicate_file). Nullable: documents stored before this field
+    # existed have none.
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=False)
     status: Mapped[DocumentStatus] = mapped_column(
         nullable=False, default=DocumentStatus.pending
     )

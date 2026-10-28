@@ -1,4 +1,5 @@
 import builtins
+import hashlib
 import uuid
 from datetime import datetime
 
@@ -81,6 +82,8 @@ class DocumentService:
         authority_tier: AuthorityTier = AuthorityTier.standard,
         restricted: bool = False,
         tags: builtins.list[str] | None = None,
+        *,
+        scope: AccessScope,
     ) -> Document:
         # Verify KB exists and belongs to org
         await kb_service.get(db, org_id, kb_id)
@@ -96,6 +99,7 @@ class DocumentService:
             authority_tier=authority_tier,
             restricted=restricted,
             tags=tags,
+            scope=scope,
         )
 
         await kb_service.increment_document_count(db, kb_id, delta=1)
@@ -129,6 +133,7 @@ class DocumentService:
             supersedes_document_id=previous.id,
             authority_tier=previous.authority_tier,
             effective_date=effective_date,
+            scope=scope,
         )
         # A new version must not become more visible than the one it replaces.
         new_document.tags = list(previous.tags or [])
@@ -209,6 +214,32 @@ class DocumentService:
         await _evict_cached_answers(doc_ids=[doc.id])
         return doc
 
+    async def _find_duplicate_file(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        kb_id: uuid.UUID,
+        file_hash: str,
+        scope: AccessScope | None,
+        exclude_document_id: uuid.UUID | None = None,
+    ) -> Document | None:
+        """The current, non-failed document in this KB with identical bytes, if the caller
+        can see it. A match the caller cannot see (a restricted document) is treated as no
+        match: `visible_document_clause` excludes it from the query, so the upload proceeds
+        rather than revealing that a hidden document exists."""
+        stmt = select(Document).where(
+            Document.organization_id == org_id,
+            Document.knowledge_base_id == kb_id,
+            Document.file_hash == file_hash,
+            Document.is_current.is_(True),
+            Document.status != DocumentStatus.failed,
+            visible_document_clause(scope),
+        )
+        if exclude_document_id is not None:
+            stmt = stmt.where(Document.id != exclude_document_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
+
     async def _store_and_create(
         self,
         db: AsyncSession,
@@ -222,6 +253,7 @@ class DocumentService:
         effective_date: datetime | None = None,
         restricted: bool = False,
         tags: builtins.list[str] | None = None,
+        scope: AccessScope | None = None,
     ) -> Document:
         file_type = self._validate_upload(file)
         safe_name = sanitize_filename(file.filename)
@@ -236,9 +268,26 @@ class DocumentService:
             raise ValidationError("File is empty")
         sniff_content(content, file_type)
 
+        file_hash = hashlib.sha256(content).hexdigest()
+
+        if supersedes_document_id is not None:
+            previous = await db.get(Document, supersedes_document_id)
+            if previous and previous.file_hash == file_hash:
+                raise ValidationError("This file is identical to the current version.")
+
+        duplicate = await self._find_duplicate_file(
+            db, org_id, kb_id, file_hash, scope, exclude_document_id=supersedes_document_id
+        )
+        if duplicate:
+            raise ValidationError(
+                f"This file is already in this knowledge base as '{duplicate.title}'."
+            )
+
         doc_id = uuid.uuid4()
         storage_path = storage_service.build_path(org_id, kb_id, doc_id, safe_name)
 
+        # Only touch storage once every check has passed, so a rejected upload leaves no
+        # orphan file behind.
         await storage_service.upload_file(
             storage_path, content, file.content_type or "application/octet-stream"
         )
@@ -251,6 +300,7 @@ class DocumentService:
             file_name=safe_name,
             file_type=file_type,
             file_size=len(content),
+            file_hash=file_hash,
             storage_path=storage_path,
             status=DocumentStatus.pending,
             uploaded_by=uploaded_by,
