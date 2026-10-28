@@ -253,14 +253,20 @@ class IngestionService:
             raise
 
     async def _supersede_previous(self, db: AsyncSession, document: Document) -> None:
-        """A new version replaces the one it supersedes only once it is ingested and ready,
-        in the same transaction, so there is never a window with no current version."""
+        """Retire the version this one replaces, only now that it is ingested. Same
+        transaction as the new chunks, so retrieval never sees neither or both."""
         if not document.supersedes_document_id:
             return
         previous = await db.get(Document, document.supersedes_document_id)
-        if previous is not None and previous.is_current:
-            previous.is_current = False
-            previous.superseded_at = datetime.now(UTC)
+        if previous is None or not previous.is_current:
+            return
+        previous.is_current = False
+        previous.superseded_at = datetime.now(UTC)
+        logger.info(
+            "document_version_superseded",
+            previous_doc_id=str(previous.id),
+            new_doc_id=str(document.id),
+        )
 
     async def _store_rows(self, db: AsyncSession, document: Document, records: list[dict]) -> None:
         """Keep tabular rows in queryable form (structured_query). Bulk insert in batches."""

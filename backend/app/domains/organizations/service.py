@@ -1,14 +1,20 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
-from supabase import create_client
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from supabase import create_client
 
 from app.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
-from app.domains.organizations.schemas import OrgCreate, OrgInvitationCreate, OrgMemberCreate, OrgMemberUpdate, OrgUpdate
+from app.domains.organizations.schemas import (
+    OrgCreate,
+    OrgInvitationCreate,
+    OrgMemberCreate,
+    OrgMemberUpdate,
+    OrgUpdate,
+)
 from app.models.org_invitation import OrgInvitation
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
@@ -291,7 +297,7 @@ class OrganizationService:
         )
         db.add(member)
 
-        invite.accepted_at = datetime.now(timezone.utc)
+        invite.accepted_at = datetime.now(UTC)
         await db.flush()
 
         logger.info("invitation_accepted", invite_id=str(invite_id), user_id=str(user_id))

@@ -1,6 +1,6 @@
 import builtins
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 import structlog
 from fastapi import UploadFile
@@ -113,11 +113,10 @@ class DocumentService:
         scope: AccessScope,
     ) -> Document:
         """Uploads a new version of an existing document. The prior version stays
-        current until the new one is ingested successfully (see
-        IngestionService._supersede_previous); only then is it excluded from
-        retrieval by default. It remains queryable for historical questions via
-        RetrievalFilters.include_superseded. If ingestion fails, the prior version
-        simply stays current, so the content never drops out of retrieval."""
+        current until the new one is ingested successfully; ingestion then marks it
+        superseded and excludes it from retrieval by default (freshness), though it
+        remains queryable for historical questions via
+        RetrievalFilters.include_superseded. A failed ingestion leaves it current."""
         previous = await self.get(db, org_id, doc_id, scope=scope)
 
         new_document = await self._store_and_create(

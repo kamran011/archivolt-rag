@@ -542,17 +542,17 @@ issues map to features that are already implemented or explicitly on the roadmap
 | Wrong document retrieved | **Built** — hybrid search + LLM reranker + RRF |
 | Hallucination / ignores context | **Built** — grounding prompt (7 explicit rules in `rag/prompts.py`), claim verifier, sufficiency gate |
 | Says "can't find" when answer exists | **Built** — adaptive query rewriting + sub-query decomposition (`retrieval/query_transform.py`) |
-| Old version quoted after update | **Bug, fixed on the V3 branch** — supersede the previous version only after the new one is ingested successfully |
+| Old version quoted after update | **Fixed on main (2026-10-28)** — the previous version is superseded only after the new one is ingested successfully (`IngestionService._supersede_previous`), in the same transaction as the new chunks; a failed ingestion leaves the old version current |
 | Users get answers from restricted docs | **Built** — `visible_document_clause(scope)` in `retrieval/access.py`, cache key includes scope |
 | Chunking strategy | **Built** — 4 strategies: fixed, structure-aware, semantic, agentic (default: structure-aware) |
 | Prompts need rewriting | **Built** — strong grounding prompt already in place; Step 0c eval provides measurable baseline |
 | Source citations with page numbers | **Built** — all chunkers store `page_number` in metadata; citation parser reads it; frontend shows `p.N` in EvidencePanel and CitationChip |
-| Eval test set | **V2 Step 0c** — 20-case eval dataset with follow-ups, comparisons, abstain cases |
+| Eval test set | **Built** — `backend/evals/datasets/v2.jsonl` (30 cases: follow-ups, comparisons, abstain cases) over `backend/evals/corpus/` |
 
-One configuration flag to enable after Step 4 evals pass:
+One configuration flag to enable once a live eval run passes (not done yet: needs real API keys):
 - `REQUIRE_VERIFICATION=True` (currently `False`) — makes the system abstain when the
   claim verifier itself errors, rather than returning an unverified answer. Safe to flip
-  once the gpt-4o-mini verifier eval shows no regression on the Step 0c dataset.
+  once the gpt-4o-mini verifier eval shows no regression on `evals/datasets/v2.jsonl`.
 
 ---
 

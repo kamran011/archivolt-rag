@@ -147,7 +147,7 @@ export function useChat(
   useEffect(() => {
     if (!initialConversationId || !orgId) return;
     let cancelled = false;
-    setLoading(true);
+    // `loading` starts true when there is a conversation to load.
     api
       .get<ApiConversationDetail>(
         `/api/v1/chat/conversations/${initialConversationId}`,

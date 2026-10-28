@@ -157,8 +157,9 @@ async def test_debug_endpoint_hides_restricted_content(world):
         json={"query": "confidential merger", "knowledge_base_ids": [kb], "top_k": 10},
         headers=world["member"],
     )
-    assert r.status_code == 200, r.text
-    assert SECRET not in json.dumps(r.json())
+    # The debugger is admin/owner-only now, so a member is refused outright.
+    assert r.status_code == 403, r.text
+    assert SECRET not in r.text
 
 
 async def test_document_endpoints_hide_restricted_document(world):

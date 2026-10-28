@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domains.documents.service import DocumentService
+from app.domains.ingestion.service import IngestionService
 from app.domains.retrieval.access import SYSTEM_SCOPE
 from app.models.document import AuthorityTier, Document, FileType
 
@@ -58,28 +59,9 @@ async def test_create_new_version_keeps_previous_current_until_ingested():
     assert result.id == new_id
     assert result.version == 2
     assert result.supersedes_document_id == previous_id
-    # Superseding happens only after the new version is ingested successfully.
+    # The old version stays answerable until the new one is ingested successfully.
     assert previous.is_current is True
     assert previous.superseded_at is None
-
-
-@pytest.mark.asyncio
-async def test_successful_ingestion_supersedes_previous_version():
-    from app.domains.ingestion.service import IngestionService
-
-    org_id, previous_id = uuid.uuid4(), uuid.uuid4()
-    previous = make_document(previous_id, org_id, version=1)
-    new_doc = make_document(uuid.uuid4(), org_id, version=2, supersedes_document_id=previous_id)
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=previous)
-
-    await IngestionService()._supersede_previous(db, new_doc)
-    assert previous.is_current is False and previous.superseded_at is not None
-
-    # A first version supersedes nothing.
-    db.get.reset_mock()
-    await IngestionService()._supersede_previous(db, previous)
-    db.get.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -117,3 +99,32 @@ async def test_list_versions_returns_full_chain_oldest_to_newest():
         chain = await service.list_versions(db, org_id, v2_id, scope=SYSTEM_SCOPE)
 
     assert [d.id for d in chain] == [v1_id, v2_id, v3_id]
+
+
+@pytest.mark.asyncio
+async def test_successful_ingestion_supersedes_previous_version():
+    org_id = uuid.uuid4()
+    previous = make_document(uuid.uuid4(), org_id, version=1)
+    new_doc = make_document(uuid.uuid4(), org_id, version=2, supersedes_document_id=previous.id)
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=previous)
+
+    await IngestionService()._supersede_previous(db, new_doc)
+
+    db.get.assert_awaited_once_with(Document, previous.id)
+    assert previous.is_current is False
+    assert previous.superseded_at is not None
+
+
+@pytest.mark.asyncio
+async def test_supersede_skips_first_versions_and_already_superseded():
+    org_id = uuid.uuid4()
+    db = AsyncMock()
+    await IngestionService()._supersede_previous(db, make_document(uuid.uuid4(), org_id))
+    db.get.assert_not_awaited()
+
+    previous = make_document(uuid.uuid4(), org_id, is_current=False)
+    db.get = AsyncMock(return_value=previous)
+    new_doc = make_document(uuid.uuid4(), org_id, version=2, supersedes_document_id=previous.id)
+    await IngestionService()._supersede_previous(db, new_doc)
+    assert previous.superseded_at is None
