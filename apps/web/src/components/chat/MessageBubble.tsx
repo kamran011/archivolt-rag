@@ -99,6 +99,22 @@ function EvidenceLink({
   );
 }
 
+/** Shown under an answer when the conversation was handed to a human. */
+function HandoffNotice({ message }: { message: ChatMessage }) {
+  if (!message.handoff?.message) return null;
+  return (
+    <div
+      role="status"
+      className="mt-2 flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text"
+    >
+      <svg className="w-4 h-4 shrink-0 text-primary mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span>{message.handoff.message}</span>
+    </div>
+  );
+}
+
 export default function MessageBubble({
   message,
   selected,
@@ -118,6 +134,7 @@ export default function MessageBubble({
         <ChatAvatar size={32} />
         <div>
           <AbstentionMessage content={message.content} />
+          <HandoffNotice message={message} />
           <EvidenceLink selected={selected} onSelect={onSelect} />
         </div>
       </div>
@@ -161,6 +178,7 @@ export default function MessageBubble({
           </span>
         )}
       </div>
+      <HandoffNotice message={message} />
       {!message.streaming && <EvidenceLink selected={selected} onSelect={onSelect} />}
       </div>
     </div>

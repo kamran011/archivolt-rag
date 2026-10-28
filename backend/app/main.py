@@ -104,6 +104,7 @@ from app.domains.analytics.router import router as analytics_router
 from app.domains.auth.router import router as auth_router
 from app.domains.chat.router import router as chat_router
 from app.domains.documents.router import router as documents_router
+from app.domains.escalation.router import router as escalation_router
 from app.domains.evals.router import router as evals_router
 from app.domains.ingestion.router import router as ingestion_router
 from app.domains.knowledge_bases.router import router as kb_router
@@ -127,3 +128,4 @@ app.include_router(
 )
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(evals_router, prefix="/api/v1/evals", tags=["evals"])
+app.include_router(escalation_router, prefix="/api/v1/escalations", tags=["escalations"])

@@ -398,3 +398,43 @@ export interface TraceMeta {
   answer_mode?: string;
   total_ms?: number;
 }
+
+/** Set when a conversation was handed to a human (V3 escalation). */
+export interface Handoff {
+  status: "created" | "already_open";
+  reasons: Array<"user_request" | "frustration" | "abstain">;
+  message: string;
+}
+
+export type EscalationTrigger = "user_request" | "frustration" | "abstain";
+
+export interface EscalationSettings {
+  enabled: boolean;
+  triggers: EscalationTrigger[];
+  emails: string[];
+  slack_webhook_url: string | null;
+  customer_message: string;
+}
+
+export interface EscalationSummary {
+  id: string;
+  conversation_id: string;
+  conversation_title: string | null;
+  user_id: string | null;
+  reasons: EscalationTrigger[];
+  status: "open" | "resolved";
+  delivery: Record<string, string>;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface EscalationDetail extends EscalationSummary {
+  trace_id: string | null;
+  transcript: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+    created_at: string;
+    abstained: boolean;
+    citations: Array<{ document_title?: string }>;
+  }>;
+}

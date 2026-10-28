@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     JEV_MODEL: str = "jev-latest"
     JEV_API_KEY: str = ""  # also accepted as TYPESAFE_API_KEY; set via env/.env, never commit
     JEV_TIMEOUT_S: float = 5.0
+    # Human handoff: judge "asks for a human" / "frustrated" with Jev when it is configured
+    # (rules otherwise). Which triggers fire and where alerts go are per-organization settings.
+    ESCALATION_USE_JEV: bool = True
     SUFFICIENCY_MIN_COVERAGE: float = 0.5  # share of the question's key terms found in evidence
     SUFFICIENCY_HIGH_CONFIDENCE: float = 0.8  # a reranker score this high overrides lexical gaps
     MAX_RETRIEVAL_EXPANSIONS: int = 2  # extra strategies tried when evidence is insufficient

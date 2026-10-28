@@ -124,6 +124,13 @@ export const api = {
       organizationId,
     }),
 
+  put: <T>(path: string, body: unknown, organizationId?: string) =>
+    request<T>(path, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      organizationId,
+    }),
+
   delete: <T>(path: string, organizationId?: string) =>
     request<T>(path, { method: "DELETE", organizationId }),
 

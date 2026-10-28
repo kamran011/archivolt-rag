@@ -86,3 +86,5 @@ class RAGResponse(BaseModel):
     retrieval_metadata: dict
     # Internal: persisted to rag_traces by the chat layer, never sent to clients.
     trace_stages: dict = Field(default_factory=dict, exclude=True)
+    # Set by the chat layer when the conversation was handed to a human (V3 escalation).
+    handoff: dict | None = None

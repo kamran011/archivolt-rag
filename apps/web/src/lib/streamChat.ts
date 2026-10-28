@@ -15,7 +15,7 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ChatStreamEvent {
-  type: "token" | "done" | "error";
+  type: "token" | "done" | "error" | "handoff";
   content?: string;
   conversation_id?: string;
   abstained?: boolean;
@@ -33,6 +33,9 @@ export interface ChatStreamEvent {
   agent?: AgentSummary;
   evidence_gate?: EvidenceGateResult;
   message?: string;
+  // "handoff" events: the conversation was handed to a human (message = text for the user).
+  status?: "created" | "already_open";
+  reasons?: Array<"user_request" | "frustration" | "abstain">;
 }
 
 interface StreamChatParams {

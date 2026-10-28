@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError
 from app.core.rate_limit import org_budget
 from app.domains.chat.schemas import ChatRequest, ConversationCreate
+from app.domains.escalation.service import maybe_escalate
 from app.domains.observability.store import save_rag_trace
 from app.domains.rag.schemas import RAGRequest, RAGResponse
 from app.domains.rag.service import rag_service
@@ -166,8 +167,7 @@ class ChatService:
             actor,
         )
 
-        db.add(
-            Message(
+        assistant = Message(
                 conversation_id=conv.id,
                 role=MessageRole.assistant,
                 content=rag_response.answer,
@@ -193,8 +193,25 @@ class ChatService:
                 },
                 abstained=rag_response.abstained,
             )
-        )
+        db.add(assistant)
         await db.flush()
+
+        handoff = await maybe_escalate(
+            db,
+            org_id=org_id,
+            conversation_id=conv.id,
+            user_id=user_id,
+            message=request.message,
+            earlier_user_messages=[h["content"] for h in history if h["role"] == "user"],
+            abstained=rag_response.abstained,
+            assistant_message_id=assistant.id,
+            trace_id=rag_response.retrieval_metadata.get("trace_id"),
+        )
+        if handoff:
+            assistant.retrieval_metadata = {**(assistant.retrieval_metadata or {}),
+                                            "handoff": handoff}
+            rag_response.handoff = handoff
+            await db.flush()
 
         md = rag_response.retrieval_metadata
         await save_rag_trace(
@@ -282,8 +299,7 @@ class ChatService:
         )
         org_budget.record(org_id, cost.get("estimated_cost_usd"))
 
-        db.add(
-            Message(
+        assistant = Message(
                 conversation_id=conv.id,
                 role=MessageRole.assistant,
                 # Verification may have replaced what was streamed (partial -> rewritten,
@@ -308,9 +324,27 @@ class ChatService:
                 token_usage=final_event.get("cost_metadata"),
                 abstained=final_event.get("abstained", False),
             )
+        db.add(assistant)
+        await db.flush()
+
+        handoff = await maybe_escalate(
+            db,
+            org_id=org_id,
+            conversation_id=conv.id,
+            user_id=user_id,
+            message=request.message,
+            earlier_user_messages=[h["content"] for h in history if h["role"] == "user"],
+            abstained=bool(final_event.get("abstained", False)),
+            assistant_message_id=assistant.id,
+            trace_id=final_event.get("trace_id"),
         )
+        if handoff:
+            assistant.retrieval_metadata = {**(assistant.retrieval_metadata or {}),
+                                            "handoff": handoff}
         await db.flush()
         await db.commit()
+        if handoff:
+            yield {"type": "handoff", **handoff, "conversation_id": str(conv.id)}
 
 
 chat_service = ChatService()

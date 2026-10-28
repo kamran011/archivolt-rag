@@ -3,6 +3,7 @@ from app.models.chunk import Chunk
 from app.models.conversation import Conversation
 from app.models.document import Document, DocumentAccess, DocumentStatus, FileType
 from app.models.document_row import DocumentRow
+from app.models.escalation import Escalation
 from app.models.eval_run import EvalDataset, EvalRun
 from app.models.job import Job
 from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
@@ -24,6 +25,7 @@ __all__ = [
     "KnowledgeBase",
     "Document",
     "Job",
+    "Escalation",
     "EvalDataset",
     "EvalRun",
     "DocumentAccess",

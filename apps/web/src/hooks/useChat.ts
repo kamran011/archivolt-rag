@@ -13,6 +13,7 @@ import type {
   ConflictInfo,
   CostMetadata,
   EvidenceGateResult,
+  Handoff,
   MessageRole,
   VerificationStatus,
 } from "@/lib/types";
@@ -34,6 +35,8 @@ export interface ChatMessage {
   spanMs?: Record<string, number | null>;
   strategy?: string;
   answerMode?: string;
+  /** Set when this turn handed the conversation to a human. */
+  handoff?: Handoff;
   /** The user question this answer responds to (shown in the evidence panel). */
   question?: string;
   streaming?: boolean;
@@ -46,6 +49,7 @@ export interface ChatOptions {
 }
 
 interface ApiRetrievalMetadata {
+  handoff?: Handoff;
   strategy?: string;
   answer_mode?: string;
   trace_id?: string;
@@ -103,6 +107,7 @@ function apiMessageToChatMessage(m: ApiMessage, allMessages: ApiMessage[]): Chat
     spanMs: md?.span_ms,
     strategy: md?.strategy,
     answerMode: md?.answer_mode,
+    handoff: md?.handoff,
     cost:
       md?.estimated_cost_usd !== undefined
         ? {
@@ -228,6 +233,15 @@ export function useChat(
                     }
                   : m
               )
+            );
+          } else if (event.type === "handoff") {
+            const handoff: Handoff = {
+              status: event.status ?? "created",
+              reasons: event.reasons ?? [],
+              message: event.message ?? "",
+            };
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, handoff } : m))
             );
           } else if (event.type === "error") {
             setError(event.message || "Something went wrong");
