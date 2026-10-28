@@ -7,8 +7,8 @@ from app.models.eval_run import EvalDataset, EvalRun
 from app.models.job import Job
 from app.models.knowledge_base import ChunkStrategy, KnowledgeBase
 from app.models.message import Message, MessageRole
-from app.models.organization import Organization
 from app.models.org_invitation import OrgInvitation
+from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember, OrgRole
 from app.models.rag_trace import RagTrace, UsageLedger
 from app.models.summary import DocumentSummary
