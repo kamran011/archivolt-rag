@@ -10,7 +10,12 @@ engine = create_async_engine(
     max_overflow=10,
     pool_recycle=300,
     pool_pre_ping=True,
-    connect_args={"prepared_statement_cache_size": 0},
+    # asyncpg's real kwarg is statement_cache_size (not prepared_statement_cache_size, which
+    # SQLAlchemy's asyncpg dialect silently drops). Required at 0 when connecting through
+    # pgbouncer in transaction/statement pooling mode (e.g. Supabase's pooler on :6543) —
+    # otherwise asyncpg's server-side prepared statements collide across pooled connections
+    # with DuplicatePreparedStatementError.
+    connect_args={"statement_cache_size": 0},
 )
 
 AsyncSessionLocal = async_sessionmaker(
