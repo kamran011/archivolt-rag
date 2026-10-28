@@ -1,0 +1,23 @@
+# Multi-hop eval dataset: questions whose answer needs facts from more than one place.
+# Requires the corpus in evals/corpus/ uploaded to a KB (same KB as v2.jsonl).
+# Purpose: decide with numbers whether Graph RAG / KAG is needed (see RAGIX_ROADMAP.md,
+# "Intentionally not built"). Watch recall@k on cross_doc (both gold documents must be
+# retrieved), keyword coverage, faithfulness, and the abstain traps.
+# Run: uv run python -m app.evals.cli run --dataset evals/datasets/multihop.jsonl --org <id> --kb <id> --output evals/reports/multihop.json
+
+# --- Cross-document: the answer chains facts from two documents ---
+{"id": "mh-annual-business-day5", "question": "I'm on the Business plan paid annually and I cancel 5 days after buying it. How much money do I get back?", "gold_documents": ["Pricing", "Refund Policy"], "gold_passages": ["$1 910", "first 7 days"], "expected_keywords": ["full refund", "910"], "tags": ["multihop", "cross_doc"]}
+{"id": "mh-lost-package-refund-timing", "question": "My order was lost in shipping. If I report it in time and you choose to refund me, how long until the money is back on my card?", "gold_documents": ["Shipping Policy", "Refund Policy"], "gold_passages": ["lost or damaged package within 30 days", "processed within 5–7 business days"], "expected_keywords": ["30 days", "business days"], "tags": ["multihop", "cross_doc"]}
+{"id": "mh-sso-plan-and-provider", "question": "Which pricing plan includes SSO, and which SSO provider do new Acme employees use to log in to internal tools?", "gold_documents": ["Pricing", "Onboarding Guide"], "gold_passages": ["SSO/SAML", "Okta SSO"], "expected_keywords": ["Business", "Okta"], "tags": ["multihop", "cross_doc"]}
+{"id": "mh-monthly-pro-partial", "question": "If I cancel my $49-a-month Pro plan halfway through the month, do I get any of that month's fee back, and do I keep access?", "gold_documents": ["Pricing", "Refund Policy"], "gold_passages": ["$49/month", "No partial refunds"], "expected_keywords": ["partial", "billing period"], "tags": ["multihop", "cross_doc"]}
+{"id": "mh-trial-before-feedback", "question": "How long is the free trial on paid plans, and does it end before a new hire's first formal feedback check-in?", "gold_documents": ["Pricing", "Onboarding Guide"], "gold_passages": ["14-day free trial", "30-, 60-, and 90-day"], "expected_keywords": ["14", "30"], "tags": ["multihop", "cross_doc"]}
+
+# --- Intra-document: the answer chains two sections of one document ---
+{"id": "mh-overage-vs-addon", "question": "I expect to go 5 000 answers over my plan limit this month. Is paying the overage charge or buying the extra-answers add-on cheaper?", "gold_documents": ["Pricing"], "gold_passages": ["$0.015 per answer", "Extra 5 000 answers"], "expected_keywords": ["75", "30", "add-on"], "tags": ["multihop", "intra_doc", "calculation"]}
+{"id": "mh-apo-overnight", "question": "I'm shipping to an APO address and want it delivered overnight. What will actually happen, and which carrier delivers it?", "gold_documents": ["Shipping Policy"], "gold_passages": ["USPS Priority Mail only", "not available for these destinations"], "expected_keywords": ["USPS", "not available"], "tags": ["multihop", "intra_doc"]}
+{"id": "mh-defective-licence", "question": "I activated a software licence and it crashes on launch. Can I get my money back, and within what time frame?", "gold_documents": ["Refund Policy"], "gold_passages": ["non-refundable", "demonstrably defective"], "expected_keywords": ["replacement", "store credit", "14 days"], "tags": ["multihop", "intra_doc"]}
+{"id": "mh-bundle-refund-timing", "question": "I already downloaded some items from a bundle. How is my refund calculated, and how long does it take to arrive?", "gold_documents": ["Refund Policy"], "gold_passages": ["bundle price minus the retail price", "processed within 5–7 business days"], "expected_keywords": ["minus", "business days"], "tags": ["multihop", "intra_doc"]}
+
+# --- Abstain traps: a tempting but false bridge between documents ---
+{"id": "mh-abstain-laptop-carrier", "question": "Which carrier does Acme use to ship laptops to new hires, and how many days does that take?", "should_abstain": true, "tags": ["multihop", "abstain"]}
+{"id": "mh-abstain-manager-start", "question": "What was Jordan Lee's start date, and when did their probation end?", "should_abstain": true, "tags": ["multihop", "abstain"]}

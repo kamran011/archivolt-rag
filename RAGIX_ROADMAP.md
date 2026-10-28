@@ -296,7 +296,10 @@ Embedding cache
   built from scratch rather than slotting into an existing policy layer
 - More comprehensive security testing
 - Multi-hop retrieval — bounded single-hop expansion exists
-  (`retrieval/expansion.py`); true multi-hop chaining does not yet
+  (`retrieval/expansion.py`); true multi-hop chaining does not yet. Measure
+  first with `backend/evals/datasets/multihop.jsonl` (added 2026-10-28:
+  cross-document, intra-document and false-bridge abstain cases); its result
+  also decides the Graph RAG / KAG entry in V6
 - Self-RAG-style reflection
 - **New gap found in this audit:** fine-grained knowledge-strip
   decomposition/recombination — correction today operates at chunk
@@ -313,6 +316,11 @@ Embedding cache
   - Settings UI: "Human handoff" section in Settings (owners/admins).
   - Inbox: `/dashboard/escalations` with list, transcript, Resolve button,
     `?id=` deep-link from notifications, and a sidebar entry.
+- ~~Long-conversation memory~~ — **built** (`v3`, 2026-10-28): summary +
+  buffer chat memory (`domains/chat/memory.py`). The last 10 messages go
+  verbatim; older ones fold into a running per-conversation summary that is
+  background only, never a citable source. Memory across conversations (MAG)
+  is deliberately not built — see V6
 - Agent workflow/report generation
 
 **Redis for agentic workloads:**
@@ -358,8 +366,8 @@ Agent
 - Website ingestion
 - Web retrieval
 - CAG for suitable stable knowledge bases
-- Knowledge graphs
-- GraphRAG
+- ~~Knowledge graphs / GraphRAG~~ — moved to V6 (2026-10-28): build only if the
+  multi-hop evals show the need
 - Cross-lingual retrieval
 - More ERP/LMS/CRM connectors
 - Slack/Teams-style channels
@@ -441,9 +449,11 @@ something like SQS rather than defaulting to Redis for everything.
 
 ## V6 — Deferred until needed
 
-Items moved out of V2 on purpose. Each is cheap to describe and expensive or
-risky to build, and none would change what users see today. Build one only when
-its trigger happens, not preemptively.
+Things we are deliberately not building, so the skip is a recorded decision
+rather than a gap someone rediscovers. Each is cheap to describe and expensive
+or risky to build, and none would change what users see today. Build one only
+when its trigger happens, not preemptively. Format: what it is, why we skip it,
+what we already have instead, and the trigger that reopens it.
 
 - **Stable chunk-ID upserts on document edits.** Unchanged chunks already reuse
   their embeddings (content hash), so the only saving left is database rows.
@@ -467,6 +477,57 @@ its trigger happens, not preemptively.
 - **Jev threshold tuning.** The 0.7 / 0.3 Noul thresholds are TypeSafe's
   suggested starting points. Trigger: an eval set built from real customer
   documents (rules vs jev comparison), e.g. via Ragas.
+
+**Added 2026-10-28** (from a review of common RAG / agent architecture lists):
+
+- **Graph RAG / KAG (knowledge-graph retrieval and reasoning).** Needs an LLM
+  entity-and-relation extraction pass over every chunk at upload (the most
+  expensive ingestion step there is, repeated on every new version), entity
+  merging ("Acme Inc" vs "Acme"), a graph store and a second retrieval path to
+  keep in sync. It only helps questions that chain relationships; most
+  document Q&A is "find the passage". Instead: hybrid search + reranking, the
+  heading-tree engine, two-level summaries, parent/neighbour expansion, and an
+  agent that can search several times. Trigger: `multihop.jsonl` cross_doc
+  cases keep failing (low recall@k or keyword coverage) *after* the V3
+  multi-hop retrieval item, or a legal/finance customer needs a traceable
+  reasoning chain per answer.
+- **MAG — memory across conversations** (episodic, semantic, procedural,
+  prospective and shared memory). In a multi-tenant product this is mostly a
+  governance problem: what may be stored, who sees it, when it is deleted, and
+  what happens when a remembered fact contradicts a newer document. A
+  remembered fact is also unverified, which competes with the cite-the-evidence
+  rule. Instead: per-conversation summary + buffer memory (V3, built).
+  Prerequisite: V3 retention rules. Trigger: users ask the assistant to
+  remember preferences across chats; start with user-editable saved
+  preferences, not memory extracted automatically from chats.
+- **Multi-agent orchestration / sub-agents.** One bounded agent
+  (`domains/agent/retrieval_agent.py`: step, token and time limits) handles
+  multi-step questions. More agents multiply cost and latency and make traces
+  harder to read. Trigger: V3 agent workflows / report generation need
+  independent subtasks that can run in parallel.
+- **CAG with a precomputed KV cache / provider prompt caching.** CAG mode exists
+  (`retrieval/cag.py`) but re-sends the whole knowledge base on every question;
+  it is opt-in per KB and its usage is unmeasured. Trigger: CAG used on KBs
+  where cost or latency shows up in Analytics. This is the cheapest item here
+  once triggered.
+- **HyDE and always-on multi-query.** An extra LLM call on every question with
+  no measured recall gap. Instead: hybrid search, the reranker, the expansion
+  ladder and adaptive query transform (`ENABLE_QUERY_TRANSFORM`). Trigger:
+  evals show vocabulary-mismatch misses that query transform does not fix.
+- **MMR (maximal marginal relevance) diversification.** Near-duplicate chunks
+  are already removed by overlap dedup in `retrieval/evidence.py`. Trigger:
+  evals show redundant context crowding out coverage on broad questions.
+- **Late chunking and LLM proposition chunking.** Late chunking needs
+  token-level embeddings from a long-context model; the OpenAI embeddings API
+  returns one pooled vector, so it would need a self-hosted embedding model.
+  Proposition chunking is an LLM call per chunk at upload. Instead: fixed,
+  structure-aware, semantic and agentic chunkers plus parent/child expansion.
+  Trigger: the V4 self-hosted model option lands (late chunking), or a
+  high-stakes corpus where evals show precision misses (propositions).
+- **MCP server.** The REST API already covers programmatic access and no
+  external agent consumer has asked for MCP. Trigger: customers want to query
+  Ragix knowledge bases from Claude, IDE agents or other MCP clients. It would
+  need the same org/KB access scoping as the public chat API.
 
 ---
 
